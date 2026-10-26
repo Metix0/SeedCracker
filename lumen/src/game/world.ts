@@ -431,14 +431,19 @@ export class World {
     return o;
   }
 
-  /** `spin` (rad/s, + = clockwise) makes an anchored orb circle the core. */
+  /**
+   * `spin` (rad/s, + = clockwise) makes an anchored orb circle the core; the spawner can set the
+   * other polar motion fields (breathing, waves, pendulum, sinking) on the returned orb.
+   */
   spawnOrb(x: number, y: number, vx: number, vy: number, anchored: boolean, delay: number, life: number, homing = 0, spin = 0): Orb | null {
     const o = this.orbs.get();
     if (!o) return null;
     o.anchored = anchored;
-    o.cw = Math.cos(spin / CFG.sim.hz);
-    o.sw = Math.sin(spin / CFG.sim.hz);
     o.ox = x - this.cx; o.oy = y - this.cy;
+    o.pr = Math.sqrt(o.ox * o.ox + o.oy * o.oy);
+    o.pa = Math.atan2(o.oy, o.ox);
+    o.pw = spin;
+    o.amp = 0; o.freq = 0; o.k = 0; o.ph = 0; o.aamp = 0; o.af = 0; o.sink = 0; o.grav = 0;
     o.x = o.px = x; o.y = o.py = y;
     o.vx = vx; o.vy = vy;
     o.t = 0; o.delay = delay; o.life = life; o.homing = homing; o.big = false; o.dying = 0;
@@ -502,7 +507,7 @@ export class World {
         continue;
       }
       if (o.t < o.delay) {
-        if (o.anchored) { o.x = o.px = this.cx + o.ox; o.y = o.py = this.cy + o.oy; }
+        if (o.anchored) { this.placeOrb(o, 0); o.px = o.x; o.py = o.y; }
         continue;
       }
       if (o.t > o.life + o.delay) {
@@ -510,12 +515,14 @@ export class World {
         continue;
       }
       if (o.anchored) {
-        const nx = o.ox * o.cw - o.oy * o.sw;
-        o.oy = o.ox * o.sw + o.oy * o.cw;
-        o.ox = nx;
-        o.x = this.cx + o.ox;
-        o.y = this.cy + o.oy;
+        if (this.placeOrb(o, o.t - o.delay)) { o.dying = 0.3; continue; }
       } else {
+        if (o.grav > 0) {
+          const dx = this.cx - o.x, dy = this.cy - o.y;
+          const d = Math.sqrt(dx * dx + dy * dy) || 1;
+          o.vx += (dx / d) * o.grav * dt;
+          o.vy += (dy / d) * o.grav * dt;
+        }
         if (o.homing > 0) {
           const dx = this.sx - o.x, dy = this.sy - o.y;
           const d = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -539,8 +546,9 @@ export class World {
           const d = Math.sqrt(d2) || 1;
           const pull = (1 - d / BO.magnetRange) * 2200 * dt + 6;
           const m = Math.min(pull, d);
-          if (o.anchored) { o.ox += (dx / d) * m; o.oy += (dy / d) * m; o.x = this.cx + o.ox; o.y = this.cy + o.oy; }
-          else { o.x += (dx / d) * m; o.y += (dy / d) * m; }
+          // a caught orb leaves its pattern and flies freely to the spark
+          if (o.anchored) { o.anchored = false; o.vx = 0; o.vy = 0; o.grav = 0; }
+          o.x += (dx / d) * m; o.y += (dy / d) * m;
         }
       }
       if (!interact || this.mode === MODE_DEAD) continue;
@@ -552,6 +560,18 @@ export class World {
       const qx = this.spx + ex * tt - o.x, qy = this.spy + ey * tt - o.y;
       if (qx * qx + qy * qy < pr2) this.collect(o);
     }
+  }
+
+  /** Position an anchored orb from its polar motion; returns true when it sank into the core. */
+  private placeOrb(o: Orb, t: number): boolean {
+    const a = o.pa + o.pw * t + (o.aamp !== 0 ? o.aamp * Math.sin(o.af * t + o.ph) : 0);
+    let r = o.pr + o.sink * t;
+    if (o.amp !== 0) r += o.amp * Math.sin(o.freq * t + o.ph + o.k * o.pa);
+    o.ox = Math.cos(a) * r;
+    o.oy = Math.sin(a) * r;
+    o.x = this.cx + o.ox;
+    o.y = this.cy + o.oy;
+    return r < CO.radius + 14;
   }
 
   private collect(o: Orb): void {

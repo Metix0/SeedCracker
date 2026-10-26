@@ -59,9 +59,17 @@ export class Orb {
   homing = -0;
   big = false;
   dying = -0;
-  /** anchored orbs circle the core: per-step rotation (cos, sin) */
-  cw = -0;
-  sw = -0;
+  /**
+   * Anchored orbs move in polar coordinates around the core (t = time since appearing):
+   *   angle  = pa + pw·t + aamp·sin(af·t + ph)              — spin, pendulum swing
+   *   radius = pr + sink·t + amp·sin(freq·t + ph + k·pa)     — sinking, breathing, waves
+   */
+  pr = -0; pa = -0; pw = -0;
+  amp = -0; freq = -0; k = -0; ph = -0;
+  aamp = -0; af = -0;
+  sink = -0;
+  /** free orbs: pull towards the core (units/s²) — fountains rise and fall back */
+  grav = -0;
 }
 
 export class Bubble {
