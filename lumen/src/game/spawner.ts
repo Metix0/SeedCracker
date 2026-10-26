@@ -9,6 +9,8 @@ const OB = CFG.obstacle;
 const T_ORB = 0, T_HALF = 1, T_FALL = 2, T_SHARD = 3, T_RING = 4, T_MINE = 5, T_VOID = 6, T_COMET = 7, T_BOOST = 8;
 /** Phase in which each spawn category is introduced. */
 const INTRO = [1, 1, 2, 3, 4, 4, 5, 6, 1];
+/** Typical band the spark moves in (between the core and the rim): obstacles aim across it. */
+const PLAY_R = 220;
 const BOOSTER_WEIGHTS = [3, 1.2, 1.2, 1.2, 1.4, 1.0, 0.8, 1.0];
 
 /**
@@ -56,7 +58,7 @@ export class Director {
     this.timers[T_ORB] -= dt;
     if (this.timers[T_ORB] <= 0) {
       this.orbPattern();
-      this.timers[T_ORB] = attract ? 3.2 : w.rng.rr(S.orbPattern) * (0.75 + 0.25 * this.density());
+      this.timers[T_ORB] = attract ? 1.6 : w.rng.rr(S.orbPattern) * (0.85 + 0.15 * this.density());
     }
     if (attract) return;
 
@@ -119,37 +121,41 @@ export class Director {
 
   private tutorialHalfOrb(lightForward: boolean): void {
     const w = this.w, o = this.tmp;
-    this.aimed(125, 0, 30, o);
-    const travel = Math.atan2(o[3], o[2]);
-    w.spawnObstacle(K_HALF, o[0], o[1], o[2], o[3], 62, lightForward ? travel : w.rng.next() * TAU, lightForward ? 0.1 : 0.35);
+    this.aimed(125, 150, 190, o);
+    // light side faces outwards at the closest approach: the falling spark lands on it and smashes it
+    const vv = o[2] * o[2] + o[3] * o[3];
+    const tc = -((o[0] - w.cx) * o[2] + (o[1] - w.cy) * o[3]) / vv;
+    const px = o[0] + o[2] * tc, py = o[1] + o[3] * tc;
+    const outward = Math.atan2(py - w.cy, px - w.cx);
+    w.spawnObstacle(K_HALF, o[0], o[1], o[2], o[3], 56, lightForward ? outward : w.rng.next() * TAU, lightForward ? 0 : 0.35);
   }
 
   private halfOrb(): void {
     const w = this.w, r = w.rng, o = this.tmp;
     const count = w.phase >= 3 && r.chance(0.35) ? 2 : 1;
     for (let k = 0; k < count; k++) {
-      this.aimed(r.rr(OB.halfOrbSpeed), 0, CFG.spark.orbitRadius * 1.1, o);
-      w.spawnObstacle(K_HALF, o[0], o[1], o[2], o[3], r.rr(OB.halfOrbRadius), r.next() * TAU, r.rr(OB.halfOrbSpin) * r.sign());
+      // pass through the spark's band, never right over the core (the spark must fall there)
+      const rad = r.rr(OB.halfOrbRadius);
+      this.aimed(r.rr(OB.halfOrbSpeed), rad + 70, PLAY_R + 50, o);
+      w.spawnObstacle(K_HALF, o[0], o[1], o[2], o[3], rad, r.next() * TAU, r.rr(OB.halfOrbSpin) * r.sign());
     }
   }
 
   private falling(): void {
     const w = this.w, r = w.rng;
     const lanes = w.phase >= 4 && r.chance(0.4) ? 2 : 1;
-    const span = CFG.spark.orbitRadius * 1.15;
-    let prev = 1e9;
+    // the two lanes (if any) go on opposite sides of the core, never straight over it
+    const side = r.sign();
     for (let k = 0; k < lanes; k++) {
-      let x = w.cx + r.range(-span, span);
-      if (Math.abs(x - prev) < 230) x = prev + (x > prev ? 260 : -260);
-      prev = x;
       const rad = r.rr(OB.fallingRadius);
+      const x = w.cx + (k === 0 ? side : -side) * r.range(rad + 80, rad + 190);
       w.spawnWarning(K_FALL, x, 0, 0, 1, OB.fallingWarn + k * 0.35, rad, r.rr(OB.fallingSpeed) * w.tempo, r.next() * TAU, r.range(0.3, 0.8) * r.sign());
     }
   }
 
   private shards(): void {
     const w = this.w, r = w.rng, o = this.tmp;
-    this.aimed(r.rr(OB.shardSpeed), 0, CFG.spark.orbitRadius, o);
+    this.aimed(r.rr(OB.shardSpeed), 120, PLAY_R + 40, o);
     const n = r.int(4, 6 + Math.min(3, w.phase - 3));
     for (let k = 0; k < n; k++) {
       const ox = r.range(-70, 70), oy = r.range(-70, 70);
@@ -160,19 +166,19 @@ export class Director {
 
   private ring(): void {
     const w = this.w, r = w.rng, o = this.tmp;
-    this.aimed(r.range(120, 180), CFG.spark.orbitRadius * 0.85, CFG.spark.orbitRadius * 1.1, o);
+    this.aimed(r.range(120, 180), PLAY_R * 0.85, PLAY_R * 1.1, o);
     w.spawnObstacle(K_RING, o[0], o[1], o[2], o[3], r.rr(OB.ringRadius), 0, 0);
   }
 
   private mine(): void {
     const w = this.w, r = w.rng, o = this.tmp;
-    this.aimed(r.range(80, 120), CFG.spark.orbitRadius * 0.4, CFG.spark.orbitRadius * 1.3, o);
+    this.aimed(r.range(80, 120), 150, PLAY_R + 60, o);
     w.spawnObstacle(K_MINE, o[0], o[1], o[2], o[3], OB.mineRadius, 0, 0);
   }
 
   private voidOrb(): void {
     const w = this.w, r = w.rng, o = this.tmp;
-    this.aimed(r.range(140, 220), 0, CFG.spark.orbitRadius * 1.1, o);
+    this.aimed(r.range(140, 220), 110, PLAY_R + 40, o);
     w.spawnObstacle(K_VOID, o[0], o[1], o[2], o[3], r.rr(OB.voidRadius), 0, 0);
   }
 
@@ -180,7 +186,7 @@ export class Director {
     const w = this.w, r = w.rng;
     const a = r.next() * TAU;
     const dx = Math.cos(a), dy = Math.sin(a);
-    const off = r.range(-CFG.spark.orbitRadius * 1.2, CFG.spark.orbitRadius * 1.2);
+    const off = r.range(110, PLAY_R + 50) * r.sign();
     const tx = w.cx - dy * off, ty = w.cy + dx * off;
     const L = 1500;
     w.spawnWarning(K_COMET, tx - dx * L, ty - dy * L, dx, dy, OB.cometWarn, OB.cometRadius, r.rr(OB.cometSpeed) * Math.min(1.25, w.tempo), 0, 0);
@@ -199,59 +205,80 @@ export class Director {
       }
     }
     this.boosters++;
-    w.spawnBubble(type, r.range(1.7, 3.8));
+    w.spawnBubble(type, r.range(1.2, 3.6), r.range(140, 260));
   }
 
   // ---------------------------------------------------------------- orb patterns
+  //
+  // The core pulls the spark in and every orb bounces it back out, so the patterns are
+  // "stepping stones" at different heights: rings, arcs, descending spirals, rotating wreaths
+  // and clusters. Holding the finger steers the falling spark onto them.
 
   private orbPattern(): void {
     const w = this.w, r = w.rng;
-    if (w.orbs.countActive() > 220) return;
+    if (w.orbs.countActive() > 140) return;
     const attract = w.mode !== 1;
-    // the very first pattern of a run is always a ring: orbiting it teaches the game without text
-    const roll = this.firstPattern ? 0 : r.next();
-    this.firstPattern = false;
-    const R = w.orbitR;
-    if (attract || roll < 0.38) {
-      // full ring around the core — orbiting plays a melody
-      const n = r.int(10, 16);
-      const start = w.ang + 0.5;
+    const t = w.runT;
+    const life = CFG.orb.anchoredLife;
+    // first seconds: generous rings just under the spark, so the very first fall bounces
+    if (attract || this.firstPattern || (t < 10 && r.chance(0.6))) {
+      this.firstPattern = false;
+      this.orbArc(r.range(118, 165), 0, TAU, r.range(-0.25, 0.25), life);
+      return;
+    }
+    const roll = r.next();
+    if (roll < 0.12) {
+      // full ring (with one gap late in the run)
+      const gap = w.phase >= 3 ? r.range(0.5, 1.1) : 0;
+      this.orbArc(r.range(110, 270), r.next() * TAU, TAU - gap, r.range(-0.35, 0.35), life);
+    } else if (roll < 0.46) {
+      // arc ahead of the spark, slightly below it
+      const rad = Math.max(105, Math.min(270, w.orbitR - r.range(-40, 100)));
+      this.orbArc(rad, w.ang + r.range(0.4, 2.4), r.range(1.0, 2.6), r.range(-0.4, 0.4), life);
+    } else if (roll < 0.7) {
+      // descending spiral: follows the path of a spark that orbits while falling
+      const n = r.int(12, 18);
+      const a0 = w.ang + r.range(0.3, 1.2);
+      const r0 = r.range(230, 275);
       for (let i = 0; i < n; i++) {
-        const a = start + (i / n) * TAU;
-        w.spawnOrb(w.cx + Math.cos(a) * R, w.cy + Math.sin(a) * R, 0, 0, true, i * 0.035, CFG.orb.anchoredLife);
-      }
-    } else if (roll < 0.62) {
-      // arc ahead of the spark
-      const n = r.int(5, 9);
-      const start = w.ang + r.range(0.6, 2.2);
-      const span = r.range(1.2, 2.6);
-      for (let i = 0; i < n; i++) {
-        const a = start + (i / (n - 1)) * span;
-        w.spawnOrb(w.cx + Math.cos(a) * R, w.cy + Math.sin(a) * R, 0, 0, true, i * 0.04, CFG.orb.anchoredLife);
+        const a = a0 + i * 0.36;
+        const rad = r0 - i * ((r0 - 110) / n);
+        w.spawnOrb(w.cx + Math.cos(a) * rad, w.cy + Math.sin(a) * rad, 0, 0, true, i * 0.03, life);
       }
     } else if (roll < 0.84) {
-      // inward spiral: crosses the orbit and gets collected by circling
-      const n = r.int(12, 18);
-      const a0 = r.next() * TAU;
-      const dir = r.sign();
-      for (let i = 0; i < n; i++) {
-        const a = a0 + dir * i * 0.42;
-        const rad = 560 + i * 26;
-        const x = w.cx + Math.cos(a) * rad, y = w.cy + Math.sin(a) * rad;
-        const inX = -Math.cos(a), inY = -Math.sin(a);
-        const sp = 105;
-        w.spawnOrb(x, y, inX * sp - inY * 40 * dir, inY * sp + inX * 40 * dir, false, i * 0.03, 9);
+      // two counter-rotating wreaths
+      const inner = r.range(110, 150);
+      this.orbArc(inner, r.next() * TAU, TAU * 0.5, 0.55, life);
+      this.orbArc(inner + r.range(80, 120), r.next() * TAU, TAU * 0.5, -0.45, life);
+    } else if (roll < 0.94) {
+      // clusters scattered around the core
+      const k = r.int(3, 5);
+      for (let c = 0; c < k; c++) {
+        const a = r.next() * TAU, rad = r.range(115, 265);
+        for (let i = 0; i < 4; i++) {
+          const ox = r.range(-26, 26), oy = r.range(-26, 26);
+          w.spawnOrb(w.cx + Math.cos(a) * rad + ox, w.cy + Math.sin(a) * rad + oy, 0, 0, true, c * 0.08 + i * 0.03, life);
+        }
       }
     } else {
-      // line of orbs drifting across the orbit
+      // a line of orbs drifting across the field
       const n = r.int(6, 9);
       const a = r.next() * TAU;
       const dx = -Math.cos(a), dy = -Math.sin(a);
-      const off = r.range(-R, R);
-      const bx = w.cx + Math.cos(a) * 720 - dy * off, by = w.cy + Math.sin(a) * 720 + dx * off;
-      for (let i = 0; i < n; i++) {
-        w.spawnOrb(bx - dx * i * 38, by - dy * i * 38, dx * 150, dy * 150, false, 0, 10);
-      }
+      const off = r.range(-200, 200);
+      const bx = w.cx + Math.cos(a) * 640 - dy * off, by = w.cy + Math.sin(a) * 640 + dx * off;
+      for (let i = 0; i < n; i++) w.spawnOrb(bx - dx * i * 38, by - dy * i * 38, dx * 150, dy * 150, false, 0, 10);
+    }
+  }
+
+  /** Orbs on an arc of radius `rad` from angle a0 spanning `span`, spaced ~44 units apart. */
+  private orbArc(rad: number, a0: number, span: number, spin: number, life: number): void {
+    const w = this.w;
+    const full = span >= TAU - 1e-3;
+    const n = Math.max(4, Math.round((rad * span) / 50));
+    for (let i = 0; i < n; i++) {
+      const a = a0 + (full ? (i / n) * TAU : (i / Math.max(1, n - 1)) * span);
+      w.spawnOrb(w.cx + Math.cos(a) * rad, w.cy + Math.sin(a) * rad, 0, 0, true, i * 0.02, life, 0, spin);
     }
   }
 }

@@ -24,9 +24,14 @@ export const CFG = {
 
   spark: {
     radius: 16,
+    /** Reference radius: start height and the radius at which maxOmega applies. */
     orbitRadius: 172,
-    /** Angular speed (rad/s) while holding. Clockwise on screen. */
+    /**
+     * Angular speed (rad/s) while holding, at orbitRadius. Clockwise on screen. Further out the
+     * spark keeps roughly the same linear speed, so it does not whip around at the rim.
+     */
     maxOmega: 5.6,
+    maxOmegaCap: 8.5,
     /** Ease-in rate when pressing (1/s, exponential approach). */
     accel: 7.5,
     /** Inertia when releasing (1/s); lower = longer glide. */
@@ -36,13 +41,38 @@ export const CFG = {
     trailLength: 44,
     tetherSegments: 14,
     tetherStiffness: 0.55,
+
+    // ---- gravity & bounces: the core pulls the spark in; light things bounce it back out
+    /** Pull towards the core (units/s²) at the start of a run … */
+    gravity: 430,
+    /** … rising by this much per phase, up to gravityMax. */
+    gravityPerPhase: 34,
+    gravityMax: 620,
+    /** Gentler pull during the first seconds of a run (teaches the bounce). */
+    gravityIntroTime: 18,
+    gravityIntroScale: 0.55,
+    /** Outward speed (units/s) given by a bounce. */
+    bounceOrb: 330,
+    bounceSmash: 420,
+    bounceThread: 470,
+    bounceBooster: 390,
+    bounceCore: 500,
+    /**
+     * Ceiling of the spark's flight. Kept well inside the screen's short side (420) so obstacles
+     * flying in are visible ~1 s before they can reach the spark, in every orientation.
+     */
+    maxRadius: 285,
+    /** The spark dies when its centre gets this close to the core centre. */
+    deathRadius: 58,
+    /** Under this radius the core starts glowing red as a warning. */
+    dangerRadius: 128,
   },
 
   core: {
     radius: 50,
     spikes: 14,
-    /** Drift area half-extent (identical everywhere; keeps the daily challenge deterministic). */
-    driftExtent: 150,
+    /** The core stays in the centre; it only breathes slightly (identical everywhere). */
+    driftExtent: 0,
     driftSpeed: 0.075,
     /** Heated core (late phases). */
     heatInterval: [13, 18] as const,
@@ -66,7 +96,7 @@ export const CFG = {
     pickupPad: 9,
     value: 10,
     life: 9,
-    anchoredLife: 8.5,
+    anchoredLife: 5.5,
   },
 
   score: {
@@ -113,10 +143,10 @@ export const CFG = {
     tutorialOrbsOnly: 7,
     firstHalfOrb: 8,
     secondHalfOrb: 14,
-    orbPattern: [2.2, 3.4] as const,
-    halfOrb: [3.2, 5.2] as const,
-    falling: [5.5, 8.5] as const,
-    shardSwarm: [6.5, 10] as const,
+    orbPattern: [1.3, 2.0] as const,
+    halfOrb: [4.2, 6.4] as const,
+    falling: [7, 10] as const,
+    shardSwarm: [8, 12] as const,
     ring: [5.5, 8.0] as const,
     mine: [9, 14] as const,
     void: [8, 13] as const,
@@ -130,10 +160,10 @@ export const CFG = {
 
   obstacle: {
     halfOrbRadius: [34, 82] as const,
-    halfOrbSpeed: [120, 210] as const,
+    halfOrbSpeed: [100, 175] as const,
     halfOrbSpin: [0.25, 1.15] as const,
     /** max radius keeps a safe spot on the orbit (orbit radius - spark radius - margin) */
-    fallingRadius: [86, 112] as const,
+    fallingRadius: [70, 92] as const,
     fallingSpeed: [210, 300] as const,
     fallingWarn: 1.05,
     shardSize: [19, 26] as const,
@@ -167,8 +197,9 @@ export const CFG = {
     shieldInvuln: 1.25,
     slowmo: 4,
     slowmoScale: 0.45,
+    /** Long tether: for 8 s the taut tether catches the spark at this radius (a safety rope). */
     longTether: 8,
-    longTetherScale: 1.35,
+    longTetherRadius: 175,
     supernovaTime: 0.8,
   },
 

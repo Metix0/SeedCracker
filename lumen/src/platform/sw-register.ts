@@ -37,10 +37,8 @@ export function registerSW(ui: UI): void {
           const nw = reg.installing;
           if (!nw) return;
           nw.addEventListener('statechange', () => {
-            if (nw.state === 'installed') {
-              if (navigator.serviceWorker.controller) offer(reg);
-              else ui.toast(t('offlineReady'));
-            }
+            // (first install needs no toast: it would cover the title; offline just works)
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) offer(reg);
           });
         });
         // check for updates when the app comes back to the foreground

@@ -446,6 +446,16 @@ export class Game implements WorldEvents {
 
     // audio intensity follows the multiplier
     if (w.mode === MODE_PLAY) this.audio.setIntensity(w.mult);
+    // falling towards the core: a heartbeat that speeds up as it gets closer
+    if (this.state === 'playing' && w.vr < 0) {
+      const danger = clamp((CFG.spark.dangerRadius - w.orbitR) / (CFG.spark.dangerRadius - CFG.spark.deathRadius), 0, 1);
+      this.heartT -= fdt;
+      if (danger > 0.05 && this.heartT <= 0) {
+        this.audio.heartbeat(danger);
+        if (danger > 0.5) this.haptics.tick();
+        this.heartT = 0.62 - danger * 0.32;
+      }
+    }
     const beat = this.audio.beat();
 
     if (this.rd.lost) return;
@@ -496,6 +506,7 @@ export class Game implements WorldEvents {
     }
   }
   private fpsT = -0;
+  private heartT = -0;
   private chainF: Floater | null = null;
   private chainF2: Floater | null = null;
 
@@ -561,6 +572,16 @@ export class Game implements WorldEvents {
     const th = this.theme, p = this.particles;
     p.burst(P_GLOW, x, y, 7, 60, 200, 0.45, 9, th.orb[0], th.orb[1], th.orb[2], 0.9);
     p.emit(P_RINGLET, x, y, 0, 0, 0.35, 22, th.orb[0], th.orb[1], th.orb[2], 0.9, 0);
+    // bounce kick: a short spray towards the core, opposite to where the spark is thrown
+    const w = this.world;
+    const dx = w.cx - x, dy = w.cy - y;
+    const d = Math.sqrt(dx * dx + dy * dy) || 1;
+    for (let k = 0; k < 3; k++) {
+      const j = (k - 1) * 0.35;
+      const ux = dx / d, uy = dy / d;
+      const sp = 380 + k * 60;
+      p.emit(P_STREAK, x, y, (ux - uy * j) * sp, (uy + ux * j) * sp, 0.22, 4, th.orb[0], th.orb[1], th.orb[2], 0.8, 4);
+    }
     this.audio.collect(note);
     this.haptics.tick();
     if (points > 0) {

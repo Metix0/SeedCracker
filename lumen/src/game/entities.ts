@@ -59,6 +59,9 @@ export class Orb {
   homing = -0;
   big = false;
   dying = -0;
+  /** anchored orbs circle the core: per-step rotation (cos, sin) */
+  cw = -0;
+  sw = -0;
 }
 
 export class Bubble {

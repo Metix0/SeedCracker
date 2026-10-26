@@ -17,6 +17,8 @@ function setup(lightFacesSpark: boolean, prism = false): World {
   const w = new World(events());
   w.reset(MODE_PLAY, 1234, false);
   w.cx = w.cy = 0;
+  w.gravityK = 0; // keep the spark at its height: these tests are about the light/dark rule
+  w.vr = 0;
   // park the obstacle on the orbit, a quarter turn ahead (clockwise)
   const a = w.ang + Math.PI / 2;
   const x = w.cx + Math.cos(a) * w.orbitR, y = w.cy + Math.sin(a) * w.orbitR;
@@ -61,6 +63,59 @@ describe('world: light/dark rule end-to-end', () => {
     orbit(w, 1.5);
     expect(w.mode).toBe(MODE_PLAY);
     expect(w.stats.prismSmashes).toBe(1);
+  });
+});
+
+describe('world: gravity and bounces', () => {
+  const fresh = (): World => {
+    const w = new World(events());
+    w.reset(MODE_PLAY, 77, false);
+    (w.director as unknown as { update: () => void }).update = noop;
+    w.obs.clear();
+    w.orbs.clear();
+    return w;
+  };
+  const run = (w: World, s: number): void => { for (let i = 0; i < s / DT && w.mode === MODE_PLAY; i++) w.step(DT); };
+
+  it('with nothing to bounce on, the spark falls into the core and the run ends', () => {
+    const w = fresh();
+    run(w, 6);
+    expect(w.mode).toBe(MODE_DEAD);
+    expect(w.orbitR).toBeLessThanOrEqual(CFG.spark.deathRadius + 1);
+  });
+
+  it('collecting an orb bounces the spark away from the core', () => {
+    const w = fresh();
+    w.vr = -200;
+    // an orb exactly where the spark will be next step
+    w.spawnOrb(w.sx, w.sy + 0.01, 0, 0, true, 0, 5);
+    w.step(DT);
+    expect(w.vr).toBeGreaterThan(CFG.spark.bounceOrb - 10);
+    expect(w.stats.orbs).toBe(1);
+  });
+
+  it('the shield saves one fall into the core', () => {
+    const w = fresh();
+    w.activate(4);
+    run(w, 6);
+    // first fall is absorbed (bounce + invulnerability), the second one kills
+    expect(w.mode).toBe(MODE_DEAD);
+    expect(w.runT).toBeGreaterThan(3);
+  });
+
+  it('the long tether catches the spark above the core', () => {
+    const w = fresh();
+    w.activate(7);
+    run(w, 4);
+    expect(w.mode).toBe(MODE_PLAY);
+    expect(w.orbitR).toBeGreaterThanOrEqual(CFG.booster.longTetherRadius - 1);
+  });
+
+  it('the spark never leaves the flight ceiling', () => {
+    const w = fresh();
+    w.vr = 5000;
+    w.step(DT);
+    expect(w.orbitR).toBeLessThanOrEqual(CFG.spark.maxRadius);
   });
 });
 

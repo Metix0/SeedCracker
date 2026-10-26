@@ -1,11 +1,11 @@
 # LUMEN
 
 Mobilna gra PWA (HTML5 + WebGL2) dla **Samsung Galaxy S24 Ultra** (Chrome / Samsung Internet) i **iPada** (Safari).
-Krążysz świetlistą iskrą wokół rdzenia: zbierasz kulki światła, rozbijasz **jasne** strony przeszkód i unikasz **ciemnych**.
+Rdzeń w środku przyciąga świetlistą iskrę. Każda zebrana kulka światła i każde rozbicie **jasnej** strony przeszkody odbija ją z powrotem na zewnątrz. Jeśli niczego nie trafi, spada w rdzeń i ginie. **Ciemnych** stron trzeba unikać.
 
 ## Sterowanie
 
-Jeden palec: przytrzymanie oznacza krążenie iskry zgodnie z ruchem wskazówek zegara, a puszczenie wyhamowanie i zawiśnięcie.
+Jeden palec: przytrzymanie obraca iskrę wokół rdzenia zgodnie z ruchem wskazówek zegara, a puszczenie wyhamowuje obrót. Tak celujesz spadającą iskrą w kulki.
 Działa też rysik (S Pen, Apple Pencil), przytrzymana mysz lub gładzik oraz **spacja**. Pauza to przycisk w rogu, systemowy gest „wstecz” na Androidzie albo wyjście z aplikacji.
 
 ## Uruchomienie lokalne
