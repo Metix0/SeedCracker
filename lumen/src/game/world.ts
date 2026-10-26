@@ -77,7 +77,11 @@ export class World {
   ang = -Math.PI / 2;
   pang = -Math.PI / 2;
   omega = -0;
+  /** current distance of the spark from the core centre, and its radial velocity (+ = outwards) */
   orbitR = -0;
+  vr = -0;
+  /** debug/tests: scales gravity (1 = normal) */
+  gravityK = 1;
   sx = -0; sy = -0; spx = -0; spy = -0;
   sr = -0;
   readonly trail = new Float32Array(SP.trailLength * 2);
@@ -159,6 +163,7 @@ export class World {
     this.ang = this.pang = -Math.PI / 2;
     this.omega = 0;
     this.orbitR = SP.orbitRadius;
+    this.vr = mode === MODE_PLAY ? 120 : 0;
     this.sr = SP.radius;
     this.placeSpark();
     this.spx = this.sx; this.spy = this.sy;
@@ -304,15 +309,29 @@ export class World {
     if (!held && this.wasHeld) this.holdOrbs = 0;
     this.wasHeld = held;
     const rocket = this.rocketT > 0;
-    const target = rocket ? SP.maxOmega * BO.rocketOmega : held ? SP.maxOmega : 0;
+    // roughly constant linear speed: slower angular speed far out, capped close to the core
+    const omegaMax = Math.min(SP.maxOmegaCap, (SP.maxOmega * SP.orbitRadius) / Math.max(this.orbitR, 60));
+    const target = rocket ? omegaMax * BO.rocketOmega : held ? omegaMax : 0;
     const rate = rocket ? 9 : held ? SP.accel : SP.release;
     this.omega += (target - this.omega) * damp(rate, dt);
     if (!held && !rocket && this.omega < 0.02) this.omega = 0;
     this.ang += this.omega * dt;
     if (this.ang > TAU * 64) { this.ang -= TAU * 64; this.pang -= TAU * 64; }
 
-    const targetR = SP.orbitRadius * (this.tetherT > 0 ? BO.longTetherScale : 1);
-    this.orbitR += (targetR - this.orbitR) * damp(5, dt);
+    // radial motion: the core pulls, bounces push out
+    if (rocket && this.vr < 300) this.vr = 300;
+    this.vr -= this.gravity() * dt;
+    this.orbitR += this.vr * dt;
+    if (this.orbitR > SP.maxRadius) {
+      this.orbitR = SP.maxRadius;
+      if (this.vr > 0) this.vr = 0;
+    }
+    if (this.tetherT > 0 && this.orbitR < BO.longTetherRadius) {
+      // the long tether goes taut and flicks the spark back up
+      this.orbitR = BO.longTetherRadius;
+      if (this.vr < 0) this.vr = Math.max(-this.vr * 0.45, SP.bounceOrb * 0.8);
+    }
+    if (this.orbitR <= SP.deathRadius) this.hitCore();
     const targetSr = SP.radius * (this.prismT > 0 ? BO.prismScale : 1);
     this.sr += (targetSr - this.sr) * damp(10, dt);
     this.placeSpark();
@@ -343,6 +362,39 @@ export class World {
         if (i + 1 < n) { tx[i + 1] -= mx; ty[i + 1] -= my; }
       }
     }
+  }
+
+  /** Current pull towards the core. */
+  gravity(): number {
+    if (this.mode !== MODE_PLAY) return SP.gravity * 0.8;
+    let g = Math.min(SP.gravityMax, SP.gravity + SP.gravityPerPhase * (this.phase - 1));
+    if (this.runT < SP.gravityIntroTime) g *= SP.gravityIntroScale + (1 - SP.gravityIntroScale) * (this.runT / SP.gravityIntroTime);
+    return g * this.gravityK;
+  }
+
+  /** Push the spark outwards (never slows down a faster rise). */
+  bounce(speed: number): void {
+    if (this.vr < speed) this.vr = speed;
+  }
+
+  /** The spark fell into the core. */
+  private hitCore(): void {
+    this.orbitR = SP.deathRadius + 0.5;
+    if (this.mode !== MODE_PLAY || this.god || this.prismT > 0 || this.rocketT > 0 || this.invulnT > 0) {
+      this.vr = SP.bounceCore;
+      return;
+    }
+    if (this.shield) {
+      this.shield = false;
+      this.invulnT = BO.shieldInvuln;
+      this.vr = SP.bounceCore;
+      this.placeSpark();
+      this.ev.shieldBreak(this.sx, this.sy);
+      return;
+    }
+    this.vr = 0;
+    this.placeSpark();
+    this.die(this.sx, this.sy);
   }
 
   private updatePhase(): void {
@@ -379,10 +431,13 @@ export class World {
     return o;
   }
 
-  spawnOrb(x: number, y: number, vx: number, vy: number, anchored: boolean, delay: number, life: number, homing = 0): Orb | null {
+  /** `spin` (rad/s, + = clockwise) makes an anchored orb circle the core. */
+  spawnOrb(x: number, y: number, vx: number, vy: number, anchored: boolean, delay: number, life: number, homing = 0, spin = 0): Orb | null {
     const o = this.orbs.get();
     if (!o) return null;
     o.anchored = anchored;
+    o.cw = Math.cos(spin / CFG.sim.hz);
+    o.sw = Math.sin(spin / CFG.sim.hz);
     o.ox = x - this.cx; o.oy = y - this.cy;
     o.x = o.px = x; o.y = o.py = y;
     o.vx = vx; o.vy = vy;
@@ -390,13 +445,13 @@ export class World {
     return o;
   }
 
-  spawnBubble(type: number, angleAhead: number): void {
+  spawnBubble(type: number, angleAhead: number, radius: number): void {
     const b = this.bubbles.get();
     if (!b) return;
     b.type = type;
     const a = this.ang + angleAhead;
-    b.ox = Math.cos(a) * this.orbitR;
-    b.oy = Math.sin(a) * this.orbitR;
+    b.ox = Math.cos(a) * radius;
+    b.oy = Math.sin(a) * radius;
     b.x = b.px = this.cx + b.ox;
     b.y = b.py = this.cy + b.oy;
     b.t = 0;
@@ -455,6 +510,9 @@ export class World {
         continue;
       }
       if (o.anchored) {
+        const nx = o.ox * o.cw - o.oy * o.sw;
+        o.oy = o.ox * o.sw + o.oy * o.cw;
+        o.ox = nx;
         o.x = this.cx + o.ox;
         o.y = this.cy + o.oy;
       } else {
@@ -498,6 +556,7 @@ export class World {
 
   private collect(o: Orb): void {
     o.active = false;
+    this.bounce(SP.bounceOrb);
     const play = this.mode === MODE_PLAY;
     const pts = CFG.orb.value * this.mult;
     if (play) {
@@ -529,6 +588,7 @@ export class World {
       const r = this.sr + BO.radius;
       if (dx * dx + dy * dy < r * r) {
         b.active = false;
+        this.bounce(SP.bounceBooster);
         this.activate(b.type);
       }
     }
@@ -756,6 +816,8 @@ export class World {
   smash(o: Obstacle, viaBolt: boolean): void {
     if (!o.active) return;
     o.active = false;
+    // the spark itself hit it: bounce away from the core (lightning chains don't move the spark)
+    if (!viaBolt) this.bounce(o.kind === K_RING && o.state === 2 ? SP.bounceThread : SP.bounceSmash);
     let base: number;
     switch (o.kind) {
       case K_HALF: base = o.r > 66 ? SC.smashLarge : o.r > 48 ? SC.smashMedium : SC.smashSmall; break;
@@ -822,6 +884,7 @@ export class World {
       this.stats.threads++;
     }
     this.ev.thread(o.x, o.y, pts);
+    o.state = 2; // threaded → strongest bounce
     this.smash(o, false);
   }
 

@@ -279,7 +279,12 @@ export class SceneDrawer {
   private core(rd: Renderer, w: World, c: DrawCtx, cx: number, cy: number): void {
     const th = c.theme;
     const style = c.look.core;
-    const heat = w.heatState === 1 ? 0.35 + 0.35 * Math.sin(c.time * 18) + Math.min(1, w.heatT / CO.heatWarn) * 0.3 : w.heatState === 2 ? 1 : 0;
+    let heat = w.heatState === 1 ? 0.35 + 0.35 * Math.sin(c.time * 18) + Math.min(1, w.heatT / CO.heatWarn) * 0.3 : w.heatState === 2 ? 1 : 0;
+    // the spark is falling dangerously close: the core glows hungry red, pulsing faster
+    if (w.mode === MODE_PLAY && w.vr < 0) {
+      const danger = clamp((SP.dangerRadius - w.orbitR) / (SP.dangerRadius - SP.deathRadius), 0, 1);
+      if (danger > 0) heat = Math.max(heat, danger * (0.55 + 0.45 * Math.sin(c.time * (10 + danger * 16))));
+    }
     const R = CO.radius * (1 + c.beat * 0.045 + heat * 0.06);
     const rot = w.crot;
     let spikes: number = CO.spikes, sl = 15;
@@ -362,7 +367,9 @@ export class SceneDrawer {
     if (sc) { col0 = sc[0]; col1 = sc[1]; col2 = sc[2]; }
     let px = w.sx, py = w.sy;
     const sr = w.sr;
-    const speedK = clamp(w.omega / SP.maxOmega, 0.15, 1.6);
+    // real speed (orbiting and falling/bouncing alike) drives the trail's intensity
+    const mvx = w.sx - w.spx, mvy = w.sy - w.spy;
+    const speedK = clamp((Math.sqrt(mvx * mvx + mvy * mvy) * CFG.sim.hz) / 700, 0.15, 1.6);
     for (let k = 1; k < n; k++) {
       const idx = (w.trailHead - 1 - k + L * 4) % L;
       const x = w.trail[idx * 2], y = w.trail[idx * 2 + 1];

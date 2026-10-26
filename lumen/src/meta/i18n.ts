@@ -2,7 +2,7 @@ export type Lang = 'pl' | 'en';
 
 const PL = {
   tapToPlay: 'Dotknij i przytrzymaj, aby grać',
-  tagline: 'Krąż. Zbieraj. Rozbijaj jasne. Unikaj ciemnego.',
+  tagline: 'Odbijaj się od światła. Rozbijaj jasne, unikaj ciemnego. Nie wpadnij w rdzeń.',
   best: 'Rekord',
   daily: 'Wyzwanie dnia',
   dailyBest: 'Rekord dnia',
@@ -95,7 +95,7 @@ const PL = {
 
 const EN: typeof PL = {
   tapToPlay: 'Touch and hold to play',
-  tagline: 'Orbit. Collect. Smash the light. Avoid the dark.',
+  tagline: 'Bounce off the light. Smash the bright, avoid the dark. Don’t fall into the core.',
   best: 'Best',
   daily: 'Daily challenge',
   dailyBest: 'Daily best',

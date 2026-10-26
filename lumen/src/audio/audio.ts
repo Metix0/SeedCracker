@@ -492,6 +492,13 @@ export class AudioEngine {
     }
   }
 
+  /** Low double thump while the spark falls towards the core; louder when closer. */
+  heartbeat(level: number): void {
+    const v = 0.18 + 0.32 * level;
+    this.oneShot('sine', 75, 42, 0.16, v, 400);
+    this.oneShot('sine', 70, 40, 0.14, v * 0.7, 400, 0.17);
+  }
+
   nearMiss(): void {
     this.whoosh(1800, 5500, 0.18, 0.16);
   }
