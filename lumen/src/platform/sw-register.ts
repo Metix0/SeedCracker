@@ -6,7 +6,8 @@ import type { UI } from '../ui/ui';
  * "New version available — tap to refresh" when an update is waiting.
  */
 export function registerSW(ui: UI): void {
-  if (!('serviceWorker' in navigator) || import.meta.env.DEV) return;
+  // the Capacitor APK serves files locally, it needs no service worker
+  if (!('serviceWorker' in navigator) || import.meta.env.DEV || import.meta.env.VITE_NATIVE === '1') return;
   // Reload only when the player asked for the update. The very first install also fires
   // controllerchange (clients.claim) and must NOT interrupt a running game.
   let updateRequested = false;

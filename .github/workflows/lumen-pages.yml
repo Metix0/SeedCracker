@@ -1,0 +1,72 @@
+# Builds the LUMEN PWA (lumen/) and publishes it to GitHub Pages on every push to main/master.
+# One-time setup: repository Settings → Pages → Build and deployment → Source: "GitHub Actions".
+name: LUMEN · GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+    paths: ['lumen/**', '.github/workflows/lumen-pages.yml']
+  pull_request:
+    paths: ['lumen/**', '.github/workflows/lumen-pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: lumen-pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lumen
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: lumen/package-lock.json
+
+      - name: Configure Pages
+        id: pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+
+      - run: npm ci
+
+      - name: Unit tests (light/dark collisions, world rules, determinism)
+        run: npm test
+
+      - name: Game loop allocation check
+        run: npm run check:alloc
+
+      - name: Build
+        env:
+          # "/<repo>/" for https://<user>.github.io/<repo>/ ; relative base for PR builds
+          BASE_PATH: ${{ github.event_name != 'pull_request' && format('{0}/', steps.pages.outputs.base_path) || './' }}
+        run: npm run build
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: lumen/dist
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

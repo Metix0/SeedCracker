@@ -1,0 +1,10 @@
+{
+  "appId": "io.github.metix0.lumen",
+  "appName": "LUMEN",
+  "webDir": "dist",
+  "backgroundColor": "#07020c",
+  "android": {
+    "backgroundColor": "#07020c",
+    "allowMixedContent": false
+  }
+}
