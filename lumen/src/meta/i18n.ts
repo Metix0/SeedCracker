@@ -88,6 +88,8 @@ const PL = {
   dailyWord: 'WYZWANIE DNIA',
   b_prism: 'PRYZMAT', b_rocket: 'RAKIETA', b_bolt: 'PIORUN', b_magnet: 'MAGNES',
   b_shield: 'TARCZA', b_slow: 'CZAS ZWOLNIONY', b_nova: 'SUPERNOWA', b_tether: 'DŁUGA LINKA',
+  b_spring: 'SPRĘŻYNA', b_double: 'PODWÓJNE PUNKTY', b_ghost: 'DUCH', b_levit: 'LEWITACJA',
+  b_shower: 'DESZCZ ŚWIATŁA', b_freeze: 'MRÓZ', b_twin: 'BLIŹNIAK',
   th_ruby: 'RUBINOWA NOC', th_sunset: 'ZŁOTY ZACHÓD', th_ocean: 'GŁĘBIA OCEANU', th_aurora: 'LODOWA ZORZA',
   th_cosmos: 'FIOLET KOSMOSU', th_emerald: 'SZMARAGDOWA MGŁAWICA', th_inferno: 'ROZGRZANY RDZEŃ',
   resumeIn: 'Wznawianie…',
@@ -181,6 +183,8 @@ const EN: typeof PL = {
   dailyWord: 'DAILY CHALLENGE',
   b_prism: 'PRISM', b_rocket: 'ROCKET', b_bolt: 'LIGHTNING', b_magnet: 'MAGNET',
   b_shield: 'SHIELD', b_slow: 'SLOW MOTION', b_nova: 'SUPERNOVA', b_tether: 'LONG TETHER',
+  b_spring: 'SPRING', b_double: 'DOUBLE POINTS', b_ghost: 'GHOST', b_levit: 'LEVITATION',
+  b_shower: 'LIGHT SHOWER', b_freeze: 'FREEZE', b_twin: 'TWIN',
   th_ruby: 'RUBY NIGHT', th_sunset: 'GOLDEN SUNSET', th_ocean: 'OCEAN DEPTHS', th_aurora: 'ICE AURORA',
   th_cosmos: 'COSMIC VIOLET', th_emerald: 'EMERALD NEBULA', th_inferno: 'HEATED CORE',
   resumeIn: 'Resuming…',
@@ -202,5 +206,8 @@ export function t(k: StrKey): string {
   return (current === 'pl' ? PL : EN)[k];
 }
 
-export const BOOSTER_KEYS: StrKey[] = ['b_prism', 'b_rocket', 'b_bolt', 'b_magnet', 'b_shield', 'b_slow', 'b_nova', 'b_tether'];
+export const BOOSTER_KEYS: StrKey[] = [
+  'b_prism', 'b_rocket', 'b_bolt', 'b_magnet', 'b_shield', 'b_slow', 'b_nova', 'b_tether',
+  'b_spring', 'b_double', 'b_ghost', 'b_levit', 'b_shower', 'b_freeze', 'b_twin',
+];
 export const THEME_KEYS: StrKey[] = ['th_ruby', 'th_sunset', 'th_ocean', 'th_aurora', 'th_cosmos', 'th_emerald', 'th_inferno'];

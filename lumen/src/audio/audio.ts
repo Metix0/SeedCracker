@@ -542,6 +542,11 @@ export class AudioEngine {
     this.oneShot('square', 660, 660, 0.12, 0.05, 2500, 0.16);
   }
 
+  laser(): void {
+    this.oneShot('sawtooth', 1400, 180, 0.45, 0.16, 3500);
+    this.noiseHit(0.35, 5000, 0.18);
+  }
+
   heatWarn(): void {
     this.oneShot('sawtooth', 70, 160, 1.6, 0.16, 900);
   }

@@ -1,3 +1,4 @@
+import { BOOSTER_COUNT } from '../game/entities';
 import { DEFAULT_EQUIP, type Category } from './cosmetics';
 
 export interface Settings {
@@ -71,7 +72,7 @@ export function defaultSave(): SaveData {
     equip: { ...DEFAULT_EQUIP },
     stats: {
       games: 0, time: 0, orbs: 0, smashes: 0, shards: 0, bestMult: 1, bestChain: 0, nearMisses: 0,
-      threads: 0, voidSmashes: 0, prismSmashes: 0, boosters: [0, 0, 0, 0, 0, 0, 0, 0], dailyPlays: 0, bestPhase: 1, crumbsEarned: 0,
+      threads: 0, voidSmashes: 0, prismSmashes: 0, boosters: new Array<number>(BOOSTER_COUNT).fill(0), dailyPlays: 0, bestPhase: 1, crumbsEarned: 0,
     },
     missions: [],
     missionsDone: 0,
@@ -101,7 +102,9 @@ export function sanitize(raw: unknown): SaveData {
   for (const id of Object.values(DEFAULT_EQUIP)) if (!d.owned.includes(id)) d.owned.push(id);
   if (!Array.isArray(d.missions)) d.missions = [];
   if (!Array.isArray(d.achievements)) d.achievements = [];
-  if (!Array.isArray(d.stats.boosters) || d.stats.boosters.length !== 8) d.stats.boosters = [0, 0, 0, 0, 0, 0, 0, 0];
+  // older saves know fewer boosters: keep their counts, pad the new ones with zeros
+  if (!Array.isArray(d.stats.boosters)) d.stats.boosters = [];
+  d.stats.boosters = Array.from({ length: BOOSTER_COUNT }, (_, i) => Math.max(0, Number(d.stats.boosters[i]) || 0));
   d.crumbs = Math.max(0, Math.floor(Number(d.crumbs) || 0));
   d.best = Math.max(0, Math.floor(Number(d.best) || 0));
   if (d.settings.lang !== 'pl' && d.settings.lang !== 'en') d.settings.lang = 'pl';

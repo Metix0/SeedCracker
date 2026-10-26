@@ -8,10 +8,23 @@ export const K_RING = 4;
 export const K_MINE = 5;
 export const K_VOID = 6;
 export const K_COMET = 7;
+/** spinning red rod, deadly along its whole length */
+export const K_BLADE = 8;
+/** small hunter that steers towards the spark for a few seconds */
+export const K_SEEKER = 9;
+/** black hole: pulls the spark and free orbs, deadly centre */
+export const K_HOLE = 10;
+/** laser beam across the screen: warning line, then a deadly beam */
+export const K_LASER = 11;
 
-export const BOOSTERS = ['prism', 'rocket', 'bolt', 'magnet', 'shield', 'slow', 'nova', 'tether'] as const;
+export const BOOSTERS = [
+  'prism', 'rocket', 'bolt', 'magnet', 'shield', 'slow', 'nova', 'tether',
+  'spring', 'double', 'ghost', 'levit', 'shower', 'freeze', 'twin',
+] as const;
 export type BoosterId = (typeof BOOSTERS)[number];
+export const BOOSTER_COUNT = BOOSTERS.length;
 export const B_PRISM = 0, B_ROCKET = 1, B_BOLT = 2, B_MAGNET = 3, B_SHIELD = 4, B_SLOW = 5, B_NOVA = 6, B_TETHER = 7;
+export const B_SPRING = 8, B_DOUBLE = 9, B_GHOST = 10, B_LEVIT = 11, B_SHOWER = 12, B_FREEZE = 13, B_TWIN = 14;
 
 /*
  * Float fields are initialised with -0 (a heap double, not a small integer) so V8 gives them a
@@ -176,7 +189,7 @@ export function newRunStats(): RunStats {
   return {
     score: 0, orbs: 0, smashes: 0, shards: 0, maxChain: 0, peakMult: 1, nearMisses: 0, time: 0,
     threads: 0, prismSmashes: 0, voidSmashes: 0, holdOrbsMax: 0, phase: 1,
-    boosters: [0, 0, 0, 0, 0, 0, 0, 0], crumbs: 0, daily: false,
+    boosters: new Array<number>(BOOSTER_COUNT).fill(0), crumbs: 0, daily: false,
   };
 }
 

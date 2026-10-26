@@ -1,7 +1,7 @@
 import { CFG } from '../config';
 import { TAU, clamp, easeOutBack, hash1, lerp } from '../core/math';
 import {
-  K_COMET, K_FALL, K_HALF, K_MINE, K_RING, K_SHARD, K_VOID,
+  BOOSTER_COUNT, K_BLADE, K_COMET, K_FALL, K_HALF, K_HOLE, K_LASER, K_MINE, K_RING, K_SEEKER, K_SHARD, K_VOID,
 } from '../game/entities';
 import type { ThemeMix } from '../game/themes';
 import { MODE_DEAD, MODE_PLAY, type World } from '../game/world';
@@ -24,8 +24,18 @@ export const BOOSTER_COLORS: [number, number, number][] = [
   [1.5, 1.2, 2.9],   // slow
   [3.0, 2.3, 1.0],   // nova
   [0.9, 2.3, 2.8],   // tether
+  [1.6, 2.8, 0.6],   // spring
+  [3.0, 2.4, 0.6],   // double points
+  [2.0, 1.9, 2.8],   // ghost
+  [0.8, 2.0, 3.0],   // levitation
+  [2.8, 2.6, 1.8],   // light shower
+  [1.0, 2.6, 3.0],   // freeze
+  [2.8, 1.2, 2.2],   // twin
 ];
-const BOOSTER_ICONS = [ICON.prism, ICON.rocket, ICON.bolt, ICON.magnet, ICON.shield, ICON.slow, ICON.nova, ICON.tether];
+const BOOSTER_ICONS = [
+  ICON.prism, ICON.rocket, ICON.bolt, ICON.magnet, ICON.shield, ICON.slow, ICON.nova, ICON.tether,
+  ICON.spring, ICON.double, ICON.ghost, ICON.levit, ICON.shower, ICON.freeze, ICON.twin,
+];
 
 /** Presentation state from the Game (screen-space info, banners, settings). */
 export interface DrawCtx {
@@ -91,8 +101,10 @@ export class SceneDrawer {
     if (ghostOn) this.ghost(rd, ghostX, ghostY, c);
     if (w.mode !== MODE_DEAD) {
       this.trail(rd, w, c);
+      if (w.twinT > 0) this.twin(rd, w, c, alpha, cx, cy);
       this.spark(rd, w, c, sx, sy);
     }
+    if (w.mode === MODE_PLAY) this.edgeArrows(rd, w, c, halfW, halfH);
     this.bubbles(rd, w, alpha, c);
     p.draw(rd, th.light[0], th.light[1], th.light[2], th.dark[0], th.dark[1], th.dark[2]);
     this.bolts(rd, w);
@@ -270,8 +282,93 @@ export class SceneDrawer {
           rd.push(SH.WAVE, x, y, 0, r * 1.6, r * 1.6, th.darkRim[0], th.darkRim[1], th.darkRim[2], 0.8, 0, 0, 0, 0, r * wob, 3, 1, 0);
           break;
         }
+        case K_BLADE: {
+          // spinning red-hot rod: dark core with a glowing danger edge, hot hub
+          const cr = Math.cos(rot) * o.r, sr = Math.sin(rot) * o.r;
+          const hw = OB.bladeWidth * 0.5;
+          rd.seg(x - cr, y - sr, x + cr, y + sr, hw, 0.09, 0.01, 0.02, fade, 2.6, 0.28, 0.16, 0.95 * fade, hw * 1.4, 0);
+          rd.seg(x - cr * 0.96, y - sr * 0.96, x + cr * 0.96, y + sr * 0.96, hw * 0.28, 2.2, 0.5, 0.3, 0.9 * fade, 0, 0, 0, 0, 1, 0);
+          rd.push(SH.DISC, x, y, 0, 30, 30, 0.12, 0.02, 0.03, fade, 2.4, 0.3, 0.2, 0.9 * fade, 11, 6, 0, 0);
+          break;
+        }
+        case K_SEEKER: {
+          // hunter: red arrowhead pointing where it flies, with a hungry pulse
+          const r = o.r;
+          const pulse = 0.6 + 0.4 * Math.sin(c.time * 14 + i);
+          const ending = o.fuse < 1.2 ? (Math.sin(c.time * 30) > 0 ? 1 : 0.4) : 1;
+          rd.glow(x, y, r * 4, 2.4, 0.2, 0.15, 0.3 * pulse * ending);
+          rd.push(SH.TRI, x, y, rot - Math.PI / 2, r * 2, r * 2, 2.6, 0.32, 0.22, fade * ending, 2.4, 0.2, 0.1, 0.8 * fade, r * 1.25, 0, fade, 1);
+          rd.push(SH.DISC, x, y, 0, r, r, 0.05, 0, 0, fade, 0, 0, 0, 0, r * 0.32, 2, 0, 0);
+          break;
+        }
+        case K_HOLE: {
+          // black hole: dark heart, an accretion ring and rings being sucked in
+          const life = Math.min(1, o.t / 0.8, o.fuse / 0.8);
+          const r = o.r * (0.4 + 0.6 * life);
+          for (let k = 0; k < 3; k++) {
+            const f = (c.time * 0.55 + k / 3) % 1;
+            const R = OB.holePull * (1 - f) * life + r;
+            rd.push(SH.WAVE, x, y, 0, R + 30, R + 30, 0.9, 0.3, 1.6, 0.35 * f * life, 0, 0, 0, 0, R, 6, 1, 0);
+          }
+          // thin hot accretion ring around a pitch-black heart (the deadly part must read as dark)
+          rd.push(SH.WAVE, x, y, 0, r * 2.4, r * 2.4, 1.6, 0.55, 1.9, 0.6 * life, 0, 0, 0, 0, r * 1.45, 4, 1, 0);
+          rd.push(SH.DISC, x, y, 0, r * 1.6, r * 1.6, 0.0, 0.0, 0.0, life, 0.9, 0.3, 1.5, 0.35 * life, r * 1.1, r * 0.12, 0, 0);
+          break;
+        }
+        case K_LASER: {
+          const L = o.r;
+          const cr = Math.cos(o.rot) * L, sr = Math.sin(o.rot) * L;
+          if (o.state === 0) {
+            // charging: dashed line that flashes faster as it is about to fire
+            const k = 1 - o.fuse / OB.laserWarn;
+            const blink = 0.5 + 0.5 * Math.sin(c.time * (12 + k * 30));
+            rd.seg(x - cr, y - sr, x + cr, y + sr, 1.6 + k * 2, 2.4, 0.35, 0.3, 0.45 + 0.4 * blink, 2.0, 0.2, 0.15, 0.35, 5, 30);
+          } else {
+            const k = o.fuse / OB.laserActive;
+            const hw = OB.laserWidth * 0.5 * (0.7 + 0.3 * k);
+            rd.seg(x - cr, y - sr, x + cr, y + sr, hw, 2.8, 2.4, 2.4, 1, 2.6, 0.3, 0.2, 0.95, hw * 1.6, 0);
+          }
+          break;
+        }
       }
+      if (w.freezeT > 0 && o.kind !== K_LASER) rd.glow(x, y, o.r * 2.2 + 20, 0.6, 1.6, 2.4, 0.22);
     }
+  }
+
+  /** Pulsing arrows on the screen edge for hazards that are about to fly in. */
+  private edgeArrows(rd: Renderer, w: World, c: DrawCtx, halfW: number, halfH: number): void {
+    const items = w.obs.items;
+    const top = c.camY - halfH + c.safeTop + 100, bottom = c.camY + halfH - c.safeBottom - 30;
+    const left = c.camX - halfW + 30, right = c.camX + halfW - 30;
+    for (let i = 0; i < items.length; i++) {
+      const o = items[i];
+      if (!o.active || o.kind === K_LASER || o.kind === K_HOLE || o.kind === K_RING) continue;
+      const ox = o.x, oy = o.y;
+      const outX = Math.max(0, Math.abs(ox - c.camX) - halfW), outY = Math.max(0, Math.abs(oy - c.camY) - halfH);
+      const out = Math.max(outX, outY) - o.r;
+      if (out <= 0) continue;
+      // only things heading into the view
+      if ((c.camX - ox) * o.vx + (c.camY - oy) * o.vy <= 0) continue;
+      const sp = Math.sqrt(o.vx * o.vx + o.vy * o.vy) || 1;
+      const eta = out / sp;
+      if (eta > 1.6) continue;
+      const k = 1 - eta / 1.6;
+      const ax = clamp(ox, left, right), ay = clamp(oy, top, bottom);
+      const blink = 0.6 + 0.4 * Math.sin(c.time * (10 + k * 14));
+      const size = 14 + k * 10;
+      rd.glow(ax, ay, size * 2.6, 2.4, 0.5, 0.25, 0.25 * k);
+      rd.push(SH.TRI, ax, ay, Math.atan2(o.vy, o.vx) - Math.PI / 2, size * 1.6, size * 1.6, 2.6, 0.75, 0.35, (0.4 + 0.6 * k) * blink, 2.0, 0.4, 0.2, 0.8, size, 0, 1, 1);
+    }
+  }
+
+  /** The twin spark (booster), mirrored through the core. */
+  private twin(rd: Renderer, w: World, c: DrawCtx, alpha: number, cx: number, cy: number): void {
+    const x = lerp(w.tspx, w.tsx, alpha), y = lerp(w.tspy, w.tsy, alpha);
+    const ending = w.twinT < 1.2 ? (Math.sin(c.time * 30) > 0 ? 1 : 0.35) : 1;
+    const col = BOOSTER_COLORS[14];
+    rd.seg(cx, cy, x, y, 1.2, col[0] * 0.5, col[1] * 0.5, col[2] * 0.5, 0.6 * ending, col[0], col[1], col[2], 0.25 * ending, 4, 0);
+    rd.glow(x, y, w.sr * 4, col[0], col[1], col[2], 0.2 * ending);
+    rd.push(SH.SPARK, x, y, 0, w.sr * 2.8, w.sr * 2.8, col[0], col[1], col[2], 1, 0, 0, 0, 0, w.sr * 0.85, 0, 0.85 * ending, 0);
   }
 
   // ---------------------------------------------------------------- core
@@ -411,6 +508,11 @@ export class SceneDrawer {
     const sr = w.sr;
     let vis = 1;
     if (w.invulnT > 0) vis = 0.45 + 0.55 * (Math.sin(c.time * 40) > 0 ? 1 : 0);
+    if (w.ghostT > 0) {
+      // ghost: translucent, shimmering spark
+      vis = 0.38 + 0.12 * Math.sin(c.time * 9);
+      if (w.ghostT < 1.2 && Math.sin(c.time * 30) > 0) vis = 0.85;
+    }
     // motion blur: faint copies along the direction of travel
     const vx = w.sx - w.spx, vy = w.sy - w.spy;
     for (let k = 3; k >= 1; k--) {
@@ -559,12 +661,19 @@ export class SceneDrawer {
     timers[5] = w.slowT / (CFG.booster.slowmo * CFG.booster.slowmoScale);
     timers[6] = 0;
     timers[7] = w.tetherT / CFG.booster.longTether;
-    for (let i = 0; i < 8; i++) if (timers[i] > 0) n++;
+    timers[8] = w.springT / CFG.booster.spring;
+    timers[9] = w.doubleT / CFG.booster.double;
+    timers[10] = w.ghostT / CFG.booster.ghost;
+    timers[11] = w.levT / CFG.booster.levit;
+    timers[12] = 0;
+    timers[13] = w.freezeT / CFG.booster.freeze;
+    timers[14] = w.twinT / CFG.booster.twin;
+    for (let i = 0; i < BOOSTER_COUNT; i++) if (timers[i] > 0) n++;
     if (n === 0) return;
     const gap = 74;
     let x = c.camX - ((n - 1) * gap) / 2;
     const y = top + 128;
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < BOOSTER_COUNT; i++) {
       const f = timers[i];
       if (f <= 0) continue;
       const col = BOOSTER_COLORS[i];
@@ -587,5 +696,5 @@ export class SceneDrawer {
   }
 }
 
-const TIMER_VALUES = new Float32Array(8);
+const TIMER_VALUES = new Float32Array(BOOSTER_COUNT);
 const easeOutCubic = (t: number): number => 1 - (1 - t) * (1 - t) * (1 - t);

@@ -6,8 +6,9 @@ import {
   darkDiskContact, halfDiskContact, halfDiskDarkGap, ringContact, segmentDistance, shardContact, subSteps, waveContact,
 } from './collision';
 import {
-  B_BOLT, B_MAGNET, B_NOVA, B_PRISM, B_ROCKET, B_SHIELD, B_SLOW, B_TETHER,
-  Bolt, Bubble, Floater, K_COMET, K_FALL, K_HALF, K_MINE, K_RING, K_SHARD, K_VOID,
+  B_BOLT, B_DOUBLE, B_FREEZE, B_GHOST, B_LEVIT, B_MAGNET, B_NOVA, B_PRISM, B_ROCKET, B_SHIELD, B_SHOWER, B_SLOW,
+  B_SPRING, B_TETHER, B_TWIN,
+  Bolt, Bubble, Floater, K_BLADE, K_COMET, K_FALL, K_HALF, K_HOLE, K_LASER, K_MINE, K_RING, K_SEEKER, K_SHARD, K_VOID,
   Obstacle, Orb, Pool, Shock, Warning, newRunStats, type RunStats,
 } from './entities';
 import { Director } from './spawner';
@@ -28,6 +29,9 @@ export interface WorldEvents {
   warn(kind: number): void;
   mineBoom(x: number, y: number): void;
   heatWarn(): void;
+  /** the twin spark was destroyed by a dark hit */
+  twinLost(x: number, y: number): void;
+  laserFire(x: number, y: number): void;
   heatBurst(): void;
   convert(x: number, y: number): void;
 }
@@ -123,6 +127,14 @@ export class World {
   magnetT = -0;
   slowT = -0;
   tetherT = -0;
+  springT = -0;
+  doubleT = -0;
+  ghostT = -0;
+  levT = -0;
+  freezeT = -0;
+  twinT = -0;
+  /** twin spark (opposite side of the core) */
+  tsx = -0; tsy = -0; tspx = -0; tspy = -0;
   shield = false;
   invulnT = -0;
   novaT = -0;
@@ -179,6 +191,7 @@ export class World {
     this.stats = newRunStats();
     this.stats.daily = daily;
     this.prismT = this.rocketT = this.boltT = this.magnetT = this.slowT = this.tetherT = 0;
+    this.springT = this.doubleT = this.ghostT = this.levT = this.freezeT = this.twinT = 0;
     this.shield = false; this.invulnT = 0; this.novaT = -1; this.endingFlags = 0;
     this.deadT = 0;
     this.ghostLen = 0;
@@ -193,12 +206,43 @@ export class World {
   }
 
   get invulnerable(): boolean {
-    return this.prismT > 0 || this.rocketT > 0 || this.invulnT > 0 || this.god || this.mode !== MODE_PLAY;
+    return this.prismT > 0 || this.rocketT > 0 || this.invulnT > 0 || this.ghostT > 0 || this.god || this.mode !== MODE_PLAY;
   }
 
   private placeSpark(): void {
     this.sx = this.cx + Math.cos(this.ang) * this.orbitR;
     this.sy = this.cy + Math.sin(this.ang) * this.orbitR;
+  }
+
+  /**
+   * Flight ceiling in direction `a`: the screen edge (minus margins) — the whole map is in play,
+   * so on a tall phone the spark can climb much higher than it can go sideways.
+   */
+  maxR(a: number): number {
+    const c = Math.cos(a), s = Math.sin(a);
+    const hw = this.viewHalfW - SP.edgeMargin;
+    let d = 1e9;
+    if (c > 1e-4) d = Math.min(d, (hw - this.cx) / c);
+    else if (c < -1e-4) d = Math.min(d, (hw + this.cx) / -c);
+    if (s < -1e-4) d = Math.min(d, (this.viewHalfH - SP.edgeMarginTop + this.cy) / -s);
+    else if (s > 1e-4) d = Math.min(d, (this.viewHalfH - SP.edgeMarginBottom - this.cy) / s);
+    return d < SP.maxRadius ? SP.maxRadius : d > 1100 ? 1100 : d;
+  }
+
+  /** Smallest ceiling over all directions (full rings must fit everywhere). */
+  reachMin(): number {
+    const a = Math.min(this.viewHalfW - SP.edgeMargin, this.viewHalfH - SP.edgeMarginTop);
+    return Math.max(SP.maxRadius, Math.min(1100, a));
+  }
+
+  /** Obstacles spawn just outside the visible area (at least the configured radius). */
+  spawnR(): number {
+    return Math.max(CFG.world.spawnRadius, Math.sqrt(this.viewHalfW * this.viewHalfW + this.viewHalfH * this.viewHalfH) + 140);
+  }
+
+  /** Points for an event: base × multiplier (× 2 with the Double points booster). */
+  award(base: number): number {
+    return base * this.mult * (this.doubleT > 0 ? 2 : 1);
   }
 
   floater(style: number, x: number, y: number, size: number, life: number, r: number, g: number, b: number): Floater | null {
@@ -321,9 +365,11 @@ export class World {
     // radial motion: the core pulls, bounces push out
     if (rocket && this.vr < 300) this.vr = 300;
     this.vr -= this.gravity() * dt;
+    if (this.levT > 0) this.vr *= Math.exp(-4 * dt); // levitation: the spark hovers
     this.orbitR += this.vr * dt;
-    if (this.orbitR > SP.maxRadius) {
-      this.orbitR = SP.maxRadius;
+    const ceil = this.maxR(this.ang);
+    if (this.orbitR > ceil) {
+      this.orbitR = ceil;
       if (this.vr > 0) this.vr = 0;
     }
     if (this.tetherT > 0 && this.orbitR < BO.longTetherRadius) {
@@ -335,6 +381,12 @@ export class World {
     const targetSr = SP.radius * (this.prismT > 0 ? BO.prismScale : 1);
     this.sr += (targetSr - this.sr) * damp(10, dt);
     this.placeSpark();
+    // twin spark mirrors the spark on the other side of the core
+    this.tspx = this.tsx; this.tspy = this.tsy;
+    const tr = Math.min(this.orbitR, this.maxR(this.ang + Math.PI));
+    this.tsx = this.cx - Math.cos(this.ang) * tr;
+    this.tsy = this.cy - Math.sin(this.ang) * tr;
+    if (this.twinT <= 0) { this.tspx = this.tsx; this.tspy = this.tsy; }
 
     // trail
     this.trail[this.trailHead * 2] = this.sx;
@@ -367,6 +419,7 @@ export class World {
   /** Current pull towards the core. */
   gravity(): number {
     if (this.mode !== MODE_PLAY) return SP.gravity * 0.8;
+    if (this.levT > 0) return 0;
     let g = Math.min(SP.gravityMax, SP.gravity + SP.gravityPerPhase * (this.phase - 1));
     if (this.runT < SP.gravityIntroTime) g *= SP.gravityIntroScale + (1 - SP.gravityIntroScale) * (this.runT / SP.gravityIntroTime);
     return g * this.gravityK;
@@ -374,13 +427,14 @@ export class World {
 
   /** Push the spark outwards (never slows down a faster rise). */
   bounce(speed: number): void {
+    if (this.springT > 0) speed *= BO.springScale;
     if (this.vr < speed) this.vr = speed;
   }
 
   /** The spark fell into the core. */
   private hitCore(): void {
     this.orbitR = SP.deathRadius + 0.5;
-    if (this.mode !== MODE_PLAY || this.god || this.prismT > 0 || this.rocketT > 0 || this.invulnT > 0) {
+    if (this.mode !== MODE_PLAY || this.god || this.prismT > 0 || this.rocketT > 0 || this.invulnT > 0 || this.ghostT > 0) {
       this.vr = SP.bounceCore;
       return;
     }
@@ -517,6 +571,7 @@ export class World {
       if (o.anchored) {
         if (this.placeOrb(o, o.t - o.delay)) { o.dying = 0.3; continue; }
       } else {
+        if (this.holes > 0) this.pullByHoles(o, dt);
         if (o.grav > 0) {
           const dx = this.cx - o.x, dy = this.cy - o.y;
           const d = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -558,7 +613,11 @@ export class World {
       let tt = l2 > 0 ? ((o.x - this.spx) * ex + (o.y - this.spy) * ey) / l2 : 1;
       tt = clamp(tt, 0, 1);
       const qx = this.spx + ex * tt - o.x, qy = this.spy + ey * tt - o.y;
-      if (qx * qx + qy * qy < pr2) this.collect(o);
+      if (qx * qx + qy * qy < pr2) { this.collect(o); continue; }
+      if (this.twinT > 0) {
+        const tx = this.tsx - o.x, ty = this.tsy - o.y;
+        if (tx * tx + ty * ty < pr2) this.collect(o);
+      }
     }
   }
 
@@ -578,7 +637,7 @@ export class World {
     o.active = false;
     this.bounce(SP.bounceOrb);
     const play = this.mode === MODE_PLAY;
-    const pts = CFG.orb.value * this.mult;
+    const pts = this.award(CFG.orb.value);
     if (play) {
       this.score += pts;
       this.stats.orbs++;
@@ -625,6 +684,13 @@ export class World {
       case B_SLOW: this.slowT = BO.slowmo * BO.slowmoScale; break;
       case B_NOVA: this.novaT = 0; this.novaX = this.sx; this.novaY = this.sy; this.novaR = 0; break;
       case B_TETHER: this.tetherT = BO.longTether; break;
+      case B_SPRING: this.springT = BO.spring; break;
+      case B_DOUBLE: this.doubleT = BO.double; break;
+      case B_GHOST: this.ghostT = BO.ghost; break;
+      case B_LEVIT: this.levT = BO.levit; this.vr = Math.max(this.vr, 0); break;
+      case B_SHOWER: this.lightShower(); break;
+      case B_FREEZE: this.freezeT = BO.freeze; break;
+      case B_TWIN: this.twinT = BO.twin; this.tspx = this.tsx; this.tspy = this.tsy; break;
     }
     this.endingFlags &= ~(1 << type);
     this.ev.booster(type);
@@ -647,6 +713,12 @@ export class World {
     this.magnetT = this.tick(this.magnetT, dt, B_MAGNET, 0);
     this.slowT = this.tick(this.slowT, dt, B_SLOW, 0.5 * BO.slowmoScale);
     this.tetherT = this.tick(this.tetherT, dt, B_TETHER, 1.2);
+    this.springT = this.tick(this.springT, dt, B_SPRING, 1);
+    this.doubleT = this.tick(this.doubleT, dt, B_DOUBLE, 1);
+    this.ghostT = this.tick(this.ghostT, dt, B_GHOST, 1.2);
+    this.levT = this.tick(this.levT, dt, B_LEVIT, 1.2);
+    this.freezeT = this.tick(this.freezeT, dt, B_FREEZE, 1);
+    this.twinT = this.tick(this.twinT, dt, B_TWIN, 1.2);
     if (this.invulnT > 0) this.invulnT = Math.max(0, this.invulnT - dt);
     if (this.novaT >= 0) {
       this.novaT += dt;
@@ -664,8 +736,20 @@ export class World {
     }
   }
 
+  /** Light shower: orbs pop up all over the map, gently bobbing. */
+  private lightShower(): void {
+    const n = BO.showerOrbs;
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * TAU;
+      const rad = 110 + Math.random() * (this.maxR(a) * 0.92 - 110);
+      const o = this.spawnOrb(this.cx + Math.cos(a) * rad, this.cy + Math.sin(a) * rad, 0, 0, true, i * 0.025, 6);
+      if (o) { o.amp = 10; o.freq = 2 + Math.random(); o.ph = Math.random() * TAU; }
+    }
+  }
+
   private convertToOrbs(o: Obstacle): void {
     o.active = false;
+    if (o.kind === K_LASER) return;
     const n = o.kind === K_SHARD ? 1 : o.r > 90 ? 6 : o.r > 50 ? 4 : 3;
     for (let k = 0; k < n; k++) {
       const a = Math.random() * TAU;
@@ -673,7 +757,7 @@ export class World {
       this.spawnOrb(o.x + Math.cos(a) * o.r * 0.4, o.y + Math.sin(a) * o.r * 0.4, Math.cos(a) * sp, Math.sin(a) * sp, false, 0, 7, 520);
     }
     if (this.mode === MODE_PLAY) {
-      this.score += 15 * this.mult;
+      this.score += this.award(15);
       this.addBar(0.5);
     }
     this.ev.convert(o.x, o.y);
@@ -685,17 +769,55 @@ export class World {
     const items = this.obs.items;
     const prism = this.prismT > 0 || this.rocketT > 0;
     const play = this.mode === MODE_PLAY && interact;
-    const cull = CFG.world.cullRadius;
+    const cull = this.spawnR() + 600;
+    const frozen = this.freezeT > 0;
+    let holes = 0;
     for (let i = 0; i < items.length; i++) {
       const o = items[i];
       if (!o.active) continue;
       o.px = o.x; o.py = o.y; o.prot = o.rot;
+      if (o.flash > 0) o.flash = Math.max(0, o.flash - dt * 5);
+      o.fade = Math.min(1, o.fade + dt * 3);
+      if (o.kind === K_LASER) {
+        // lasers keep their timing even when frozen: warning → beam → gone
+        o.t += dt;
+        o.fuse -= dt;
+        if (o.fuse <= 0) {
+          if (o.state === 0) {
+            o.state = 1;
+            o.fuse = OB.laserActive;
+            this.ev.laserFire(o.x, o.y);
+          } else { o.active = false; continue; }
+        }
+        if (play && o.state === 1) this.collideLaser(o);
+        continue;
+      }
+      if (frozen) {
+        if (o.kind === K_HOLE) holes++;
+        if (play) this.collide(o, prism, dt);
+        continue;
+      }
       o.t += dt;
+      if (o.kind === K_SEEKER) {
+        // steer towards the spark (limited turning), then fizzle out
+        const dx = this.sx - o.x, dy = this.sy - o.y;
+        const d = Math.sqrt(dx * dx + dy * dy) || 1;
+        const sp = OB.seekerSpeed * Math.min(1.3, this.tempo);
+        const k = damp(OB.seekerTurn, dt);
+        o.vx += ((dx / d) * sp - o.vx) * k;
+        o.vy += ((dy / d) * sp - o.vy) * k;
+        o.rot = Math.atan2(o.vy, o.vx);
+        o.fuse -= dt;
+        if (o.fuse <= 0) { o.active = false; this.ev.convert(o.x, o.y); continue; }
+      } else if (o.kind === K_HOLE) {
+        o.fuse -= dt;
+        if (o.fuse <= 0) { o.active = false; continue; }
+        holes++;
+        this.pullSparkByHole(o, dt);
+      }
       o.x += o.vx * dt;
       o.y += o.vy * dt;
       o.rot += o.spin * dt;
-      o.fade = Math.min(1, o.fade + dt * 3);
-      if (o.flash > 0) o.flash = Math.max(0, o.flash - dt * 5);
 
       // cull far objects moving away
       const ox = o.x, oy = o.y;
@@ -722,6 +844,64 @@ export class World {
       if (!play) continue;
       this.collide(o, prism, dt);
     }
+    this.holes = holes;
+  }
+
+  /** active black holes this step (pull free orbs too) */
+  holes = 0;
+
+  /** Strength of a hole's pull at distance d (fades in and out over its life). */
+  private holeAccel(o: Obstacle, d: number): number {
+    if (d >= OB.holePull || d < 1) return 0;
+    const life = Math.min(1, o.t / 0.8, o.fuse / 0.8);
+    return OB.holeStrength * (1 - d / OB.holePull) * life;
+  }
+
+  /** The spark moves in polar coordinates: split the pull into radial (vr) and angular (omega) parts. */
+  private pullSparkByHole(o: Obstacle, dt: number): void {
+    if (this.mode !== MODE_PLAY) return;
+    const dx = o.x - this.sx, dy = o.y - this.sy;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    const acc = this.holeAccel(o, d);
+    if (acc <= 0) return;
+    const ax = (dx / d) * acc, ay = (dy / d) * acc;
+    const r = Math.max(this.orbitR, 60);
+    const ux = (this.sx - this.cx) / r, uy = (this.sy - this.cy) / r;
+    this.vr += (ax * ux + ay * uy) * dt;
+    this.omega += ((ax * -uy + ay * ux) / r) * dt;
+  }
+
+  private pullByHoles(orb: Orb, dt: number): void {
+    const items = this.obs.items;
+    for (let i = 0; i < items.length; i++) {
+      const o = items[i];
+      if (!o.active || o.kind !== K_HOLE) continue;
+      const dx = o.x - orb.x, dy = o.y - orb.y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      const acc = this.holeAccel(o, d) * 1.4;
+      if (acc <= 0) continue;
+      orb.vx += (dx / d) * acc * dt;
+      orb.vy += (dy / d) * acc * dt;
+      if (d < o.r) orb.dying = 0.2; // swallowed
+    }
+  }
+
+  /** A laser beam is a long segment through (x, y) along `rot`; only its active phase hurts. */
+  private collideLaser(o: Obstacle): void {
+    const c = Math.cos(o.rot), s = Math.sin(o.rot);
+    const L = o.r;
+    const d = segmentDistance(this.sx, this.sy, o.x - c * L, o.y - s * L, o.x + c * L, o.y + s * L);
+    if (d < (OB.laserWidth * 0.5 + this.sr) * CFG.hitbox.darkScale) this.darkHit(o, this.sx, this.sy);
+    if (this.twinT > 0) {
+      const dt2 = segmentDistance(this.tsx, this.tsy, o.x - c * L, o.y - s * L, o.x + c * L, o.y + s * L);
+      if (dt2 < OB.laserWidth * 0.5 + this.sr * 0.8) this.loseTwin();
+    }
+  }
+
+  private loseTwin(): void {
+    if (this.twinT <= 0) return;
+    this.twinT = 0;
+    this.ev.twinLost(this.tsx, this.tsy);
   }
 
   /** Swept collision of the spark against one obstacle (sub-stepped). */
@@ -750,9 +930,20 @@ export class World {
         case K_SHARD:
           side = shardContact(ox, oy, rot, o.r, sx, sy, sr, prism);
           break;
-        case K_VOID:
+        case K_VOID: case K_SEEKER:
           side = darkDiskContact(ox, oy, o.r, sx, sy, sr, prism);
           break;
+        case K_HOLE:
+          // only the dark heart kills; the pull itself is handled by pullSparkByHole
+          side = darkDiskContact(ox, oy, o.r * 0.75, sx, sy, sr, prism);
+          break;
+        case K_BLADE: {
+          const c = Math.cos(rot) * o.r, s = Math.sin(rot) * o.r;
+          const d = segmentDistance(sx, sy, ox - c, oy - s, ox + c, oy + s);
+          if (prism) { if (d < OB.bladeWidth * 0.5 + sr) side = SIDE_LIGHT; }
+          else if (d < (OB.bladeWidth * 0.5 + sr) * CFG.hitbox.darkScale) side = SIDE_DARK;
+          break;
+        }
         case K_MINE:
           if (o.state === 0) side = darkDiskContact(ox, oy, o.r, sx, sy, sr, prism);
           else if (waveContact(ox, oy, o.waveR, OB.mineWaveBand, sx, sy, sr)) side = prism ? 0 : SIDE_DARK;
@@ -777,8 +968,9 @@ export class World {
         return;
       }
     }
-    // near miss
-    if (!prism && !o.nearDone && o.kind !== K_RING && !(o.kind === K_MINE && o.state === 1)) {
+    if (this.twinT > 0) this.collideTwin(o, prism);
+    // near miss (round hazards only)
+    if (!prism && !o.nearDone && o.kind !== K_RING && o.kind !== K_BLADE && o.kind !== K_HOLE && !(o.kind === K_MINE && o.state === 1)) {
       let gap: number;
       if (o.kind === K_HALF || o.kind === K_FALL || o.kind === K_COMET) gap = halfDiskDarkGap(o.x, o.y, o.rot, o.r, this.sx, this.sy, sr);
       else {
@@ -789,7 +981,7 @@ export class World {
       else if (o.nearIn && gap > CFG.hitbox.nearMissDist * 1.6) {
         o.nearIn = false;
         o.nearDone = true;
-        const pts = SC.nearMiss * this.mult;
+        const pts = this.award(SC.nearMiss);
         this.score += pts;
         this.stats.nearMisses++;
         this.addBar(1);
@@ -799,16 +991,39 @@ export class World {
   }
 
   private darkHit(o: Obstacle, x: number, y: number): void {
-    if (this.prismT > 0 || this.rocketT > 0) { this.smash(o, false); return; }
-    if (this.invulnT > 0 || this.god) return;
+    const beam = o.kind === K_LASER;
+    if (this.prismT > 0 || this.rocketT > 0) { if (!beam) this.smash(o, false); return; }
+    if (this.invulnT > 0 || this.ghostT > 0 || this.god) return;
     if (this.shield) {
       this.shield = false;
       this.invulnT = BO.shieldInvuln;
       this.ev.shieldBreak(x, y);
-      if (!(o.kind === K_MINE && o.state === 1)) this.smash(o, false);
+      if (!beam && !(o.kind === K_MINE && o.state === 1)) this.smash(o, false);
       return;
     }
     this.die(x, y);
+  }
+
+  /** The twin smashes light sides like the spark; a dark hit just destroys the twin. */
+  private collideTwin(o: Obstacle, prism: boolean): void {
+    if (!o.active) return;
+    const x = this.tsx, y = this.tsy, sr = this.sr * 0.85;
+    let side = 0;
+    switch (o.kind) {
+      case K_HALF: case K_FALL: case K_COMET: side = halfDiskContact(o.x, o.y, o.rot, o.r, x, y, sr, prism); break;
+      case K_SHARD: side = shardContact(o.x, o.y, o.rot, o.r, x, y, sr, prism); break;
+      case K_VOID: case K_SEEKER: side = darkDiskContact(o.x, o.y, o.r, x, y, sr, prism); break;
+      case K_MINE: if (o.state === 0) side = darkDiskContact(o.x, o.y, o.r, x, y, sr, prism); break;
+      case K_HOLE: side = darkDiskContact(o.x, o.y, o.r * 0.75, x, y, sr, prism); break;
+      case K_RING: if (ringContact(o.x, o.y, o.r, OB.ringThickness, x, y, sr) !== 0) side = SIDE_LIGHT; break;
+      case K_BLADE: {
+        const c = Math.cos(o.rot) * o.r, s = Math.sin(o.rot) * o.r;
+        if (segmentDistance(x, y, o.x - c, o.y - s, o.x + c, o.y + s) < OB.bladeWidth * 0.5 + sr) side = prism ? SIDE_LIGHT : SIDE_DARK;
+        break;
+      }
+    }
+    if (side === SIDE_LIGHT) this.smash(o, false);
+    else if (side === SIDE_DARK && this.ghostT <= 0) this.loseTwin();
   }
 
   /** Heated-core spikes. */
@@ -820,7 +1035,7 @@ export class World {
       const bx = this.cx + Math.cos(a) * len, by = this.cy + Math.sin(a) * len;
       const d = segmentDistance(this.sx, this.sy, this.cx, this.cy, bx, by);
       if (d < (CO.heatSpikeWidth * 0.5 + this.sr) * CFG.hitbox.darkScale) {
-        if (this.prismT > 0 || this.rocketT > 0 || this.invulnT > 0 || this.god) return;
+        if (this.prismT > 0 || this.rocketT > 0 || this.invulnT > 0 || this.ghostT > 0 || this.god) return;
         if (this.shield) {
           this.shield = false;
           this.invulnT = BO.shieldInvuln;
@@ -847,6 +1062,9 @@ export class World {
       case K_MINE: base = SC.mineDefuse; break;
       case K_VOID: base = SC.voidSmash; this.stats.voidSmashes++; break;
       case K_COMET: base = SC.cometSmash; break;
+      case K_BLADE: base = SC.bladeSmash; break;
+      case K_SEEKER: base = SC.seekerSmash; break;
+      case K_HOLE: base = SC.holeSmash; break;
       default: base = SC.smashSmall;
     }
     if (this.prismT > 0) this.stats.prismSmashes++;
@@ -859,8 +1077,8 @@ export class World {
       bonus = this.chain < tbl.length ? tbl[this.chain] : tbl[tbl.length - 1] * Math.pow(2, this.chain - tbl.length + 1);
       bonus = Math.min(bonus, 2560);
     }
-    const pts = base * this.mult;
-    const bonusPts = bonus * this.mult;
+    const pts = this.award(base);
+    const bonusPts = this.award(bonus);
     if (this.mode === MODE_PLAY) {
       this.score += pts + bonusPts;
       this.stats.smashes++;
@@ -889,7 +1107,7 @@ export class World {
     const items = this.obs.items;
     for (let i = 0; i < items.length; i++) {
       const o = items[i];
-      if (!o.active || o.kind === K_MINE || o.kind === K_VOID) continue;
+      if (!o.active || o.kind === K_MINE || o.kind === K_VOID || o.kind === K_LASER || o.kind === K_HOLE) continue;
       const dx = o.x - x, dy = o.y - y;
       const d = dx * dx + dy * dy;
       if (d < bd) { bd = d; best = o; }
@@ -898,7 +1116,7 @@ export class World {
   }
 
   private threadRing(o: Obstacle): void {
-    const pts = SC.ringThread * this.mult;
+    const pts = this.award(SC.ringThread);
     if (this.mode === MODE_PLAY) {
       this.score += pts;
       this.stats.threads++;

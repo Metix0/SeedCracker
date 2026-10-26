@@ -17,7 +17,7 @@ import { Renderer, type FrameParams } from '../render/renderer';
 import { BOOSTER_COLORS, SceneDrawer, type DrawCtx } from '../render/scene';
 import { GlyphAtlas, TextBuf } from '../render/text';
 import { UI } from '../ui/ui';
-import { B_NOVA, B_PRISM, B_SHIELD, B_SLOW, K_COMET, K_FALL, K_MINE, K_SHARD, K_VOID, type Floater, type RunStats } from './entities';
+import { B_NOVA, B_PRISM, B_SHIELD, B_SLOW, K_COMET, K_FALL, K_MINE, K_SHARD, K_VOID, K_SEEKER, K_HOLE, K_BLADE, K_LASER, K_HALF, type Floater, type RunStats } from './entities';
 import { ThemeMix, THEMES } from './themes';
 import { MODE_ATTRACT, MODE_DEAD, MODE_PLAY, World, type WorldEvents } from './world';
 
@@ -523,6 +523,14 @@ export class Game implements WorldEvents {
       } else if (o.kind === K_FALL && Math.random() < dt * 20) {
         const a = Math.random() * TAU;
         p.emit(P_GLOW, o.x + Math.cos(a) * o.r, o.y + Math.sin(a) * o.r, 0, -40, 0.8, 10, th.light[0], th.light[1], th.light[2], 0.35, 1);
+      } else if (o.kind === K_SEEKER && Math.random() < dt * 40) {
+        p.emit(P_GLOW, o.x, o.y, -o.vx * 0.2, -o.vy * 0.2, 0.4, 9, 2.4, 0.3, 0.2, 0.6, 2);
+      } else if (o.kind === K_HOLE && Math.random() < dt * 30) {
+        const a = Math.random() * TAU, R = CFG.obstacle.holePull * (0.5 + Math.random() * 0.5);
+        p.emit(P_GLOW, o.x + Math.cos(a) * R, o.y + Math.sin(a) * R, -Math.cos(a) * 260 - Math.sin(a) * 120, -Math.sin(a) * 260 + Math.cos(a) * 120, 0.9, 6, 1.4, 0.6, 2.2, 0.7, 0.5);
+      } else if (o.kind === K_BLADE && Math.random() < dt * 14) {
+        const e = Math.random() < 0.5 ? 1 : -1;
+        p.emit(P_STREAK, o.x + Math.cos(o.rot) * o.r * e, o.y + Math.sin(o.rot) * o.r * e, -Math.sin(o.rot) * o.spin * o.r * e, Math.cos(o.rot) * o.spin * o.r * e, 0.25, 4, 2.6, 0.5, 0.25, 0.8, 4);
       } else if (o.kind === K_VOID && Math.random() < dt * 12) {
         const a = Math.random() * TAU;
         p.emit(P_GLOW, o.x + Math.cos(a) * o.r * 2.2, o.y + Math.sin(a) * o.r * 2.2, -Math.cos(a) * 50, -Math.sin(a) * 50, 0.5, 6, th.darkRim[0], th.darkRim[1], th.darkRim[2], 0.6, 0);
@@ -755,6 +763,20 @@ export class Game implements WorldEvents {
     this.haptics.smash();
   }
 
+  twinLost(x: number, y: number): void {
+    this.particles.burst(P_SHARD, x, y, 18, 160, 480, 0.7, 5, 2.8, 1.2, 2.2, 1, 2);
+    this.world.shock(x, y, 220, 0.4, 2.8, 1.2, 2.2, 1, 16);
+    this.audio.shieldBreak();
+    this.haptics.smash();
+  }
+
+  laserFire(x: number, y: number): void {
+    this.shake(0.18);
+    this.doFlash(0.12, 1.4, 0.25, 0.2);
+    this.audio.laser();
+    void x; void y;
+  }
+
   heatWarn(): void {
     this.audio.heatWarn();
     this.haptics.warn();
@@ -792,6 +814,16 @@ export class Game implements WorldEvents {
       advance: (sec: number) => { const n = Math.round(sec * CFG.sim.hz); for (let i = 0; i < n; i++) this.step(1 / CFG.sim.hz); },
       state: () => ({ state: this.state, score: this.world.score, mult: this.world.mult, phase: this.world.phase, obstacles: this.world.obs.countActive(), orbs: this.world.orbs.countActive(), fps: this.loop.fps, hdr: this.rd.hdr }),
       clearBanner: () => { this.bannerT = -1; },
+      /** one of each newer hazard around the spark (screenshots) */
+      hazards: () => {
+        const w = this.world;
+        w.spawnObstacle(K_BLADE, 230, -330, 0, 0, 100, 0.4, 2);
+        const s = w.spawnObstacle(K_SEEKER, -320, -420, 60, 80, 15, 0, 0); if (s) s.fuse = 5;
+        const h = w.spawnObstacle(K_HOLE, -190, 260, 0, 0, 34, 0, 1.2); if (h) { h.fuse = 6; h.t = 2; }
+        const l1 = w.spawnObstacle(K_LASER, 0, 380, 0, 0, 2600, 0.15, 0); if (l1) { l1.fuse = 0.6; l1.fade = 1; }
+        const l2 = w.spawnObstacle(K_LASER, 0, -560, 0, 0, 2600, -0.2, 0); if (l2) { l2.state = 1; l2.fuse = 0.8; l2.fade = 1; }
+        w.spawnObstacle(K_HALF, 900, -150, -90, 0, 60, 0, 0.4);
+      },
     };
   }
 }

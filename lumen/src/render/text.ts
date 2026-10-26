@@ -21,8 +21,15 @@ export const ICON = {
   nova: 0xe006,
   tether: 0xe007,
   crumb: 0xe008,
+  spring: 0xe009,
+  double: 0xe00a,
+  ghost: 0xe00b,
+  levit: 0xe00c,
+  shower: 0xe00d,
+  freeze: 0xe00e,
+  twin: 0xe00f,
 } as const;
-const ICON_COUNT = 9;
+const ICON_COUNT = 16;
 
 export interface Glyph {
   u0: number; v0: number; u1: number; v1: number;
@@ -191,6 +198,82 @@ function drawIcon(ctx: CanvasRenderingContext2D, i: number, cx: number, cy: numb
       ctx.lineWidth = r * 0.18;
       ctx.moveTo(cx + r * 0.3, cy); ctx.lineTo(cx + r * 0.62, cy);
       ctx.moveTo(cx + r * 0.48, cy - r * 0.16); ctx.lineTo(cx + r * 0.66, cy); ctx.lineTo(cx + r * 0.48, cy + r * 0.16);
+      ctx.stroke();
+      break;
+    }
+    case 9: { // spring: coil
+      ctx.lineWidth = r * 0.17;
+      ctx.moveTo(cx - r * 0.55, cy + r * 0.85);
+      for (let k = 0; k < 6; k++) {
+        const y = cy + r * 0.85 - (k + 0.5) * (r * 1.7 / 6);
+        ctx.lineTo(k % 2 === 0 ? cx + r * 0.55 : cx - r * 0.55, y);
+      }
+      ctx.lineTo(cx - r * 0.55, cy - r * 0.85);
+      ctx.stroke();
+      break;
+    }
+    case 10: { // double points: ×2
+      ctx.save();
+      ctx.translate(cx, cy + 4);
+      ctx.scale(0.72, 0.72);
+      ctx.fillText('×2', 0, 0);
+      ctx.restore();
+      break;
+    }
+    case 11: { // ghost: dome with a wavy hem and two eyes (even-odd holes)
+      ctx.moveTo(cx - r * 0.7, cy + r * 0.85);
+      ctx.lineTo(cx - r * 0.7, cy - r * 0.1);
+      ctx.arc(cx, cy - r * 0.1, r * 0.7, Math.PI, 0);
+      ctx.lineTo(cx + r * 0.7, cy + r * 0.85);
+      for (let k = 0; k < 4; k++) {
+        const x0 = cx + r * 0.7 - (k + 0.5) * (r * 1.4 / 4);
+        ctx.quadraticCurveTo(x0, cy + r * (k % 2 === 0 ? 0.5 : 1.0), x0 - r * 0.175, cy + r * 0.85);
+      }
+      ctx.closePath();
+      ctx.moveTo(cx - r * 0.15, cy - r * 0.1);
+      ctx.arc(cx - r * 0.27, cy - r * 0.1, r * 0.12, 0, Math.PI * 2);
+      ctx.moveTo(cx + r * 0.39, cy - r * 0.1);
+      ctx.arc(cx + r * 0.27, cy - r * 0.1, r * 0.12, 0, Math.PI * 2);
+      ctx.fill('evenodd');
+      break;
+    }
+    case 12: { // levitation: double up-chevrons
+      ctx.lineWidth = r * 0.24;
+      ctx.moveTo(cx - r * 0.6, cy + r * 0.05); ctx.lineTo(cx, cy - r * 0.55); ctx.lineTo(cx + r * 0.6, cy + r * 0.05);
+      ctx.moveTo(cx - r * 0.6, cy + r * 0.7); ctx.lineTo(cx, cy + r * 0.1); ctx.lineTo(cx + r * 0.6, cy + r * 0.7);
+      ctx.stroke();
+      break;
+    }
+    case 13: { // light shower: droplets
+      const drops = [[-0.45, -0.45, 0.24], [0.3, -0.6, 0.2], [0.05, 0.05, 0.28], [-0.5, 0.5, 0.2], [0.5, 0.45, 0.24]];
+      for (const [dx, dy, rr] of drops) {
+        ctx.moveTo(cx + dx * r + rr * r, cy + dy * r);
+        ctx.arc(cx + dx * r, cy + dy * r, rr * r, 0, Math.PI * 2);
+      }
+      ctx.fill();
+      break;
+    }
+    case 14: { // freeze: snowflake
+      ctx.lineWidth = r * 0.15;
+      for (let k = 0; k < 3; k++) {
+        const a = (k / 3) * Math.PI;
+        const dx = Math.cos(a), dy = Math.sin(a);
+        ctx.moveTo(cx - dx * r * 0.9, cy - dy * r * 0.9); ctx.lineTo(cx + dx * r * 0.9, cy + dy * r * 0.9);
+        for (const sgn of [-1, 1]) {
+          const bx = cx + dx * r * 0.55 * sgn, by = cy + dy * r * 0.55 * sgn;
+          ctx.moveTo(bx, by); ctx.lineTo(bx + (dx * sgn * 0.25 - dy * 0.22) * r, by + (dy * sgn * 0.25 + dx * 0.22) * r);
+          ctx.moveTo(bx, by); ctx.lineTo(bx + (dx * sgn * 0.25 + dy * 0.22) * r, by + (dy * sgn * 0.25 - dx * 0.22) * r);
+        }
+      }
+      ctx.stroke();
+      break;
+    }
+    case 15: { // twin: two sparks
+      ctx.arc(cx - r * 0.38, cy, r * 0.32, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.lineWidth = r * 0.14;
+      ctx.arc(cx + r * 0.42, cy, r * 0.3, 0, Math.PI * 2);
       ctx.stroke();
       break;
     }

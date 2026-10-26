@@ -34,7 +34,7 @@ function setup() {
     multUp: noop, multDown: noop, phase: noop,
     nearMiss: (x, y, p) => { const f = w.floater(2, x, y, 28, 0.9, 1, 2, 2); if (f) f.buf.str('NEAR MISS +').int(p); },
     thread: noop, booster: noop, boosterEnding: noop, shieldBreak: noop, death: noop, warn: noop, mineBoom: noop,
-    heatWarn: noop, heatBurst: noop, convert: noop,
+    heatWarn: noop, heatBurst: noop, convert: noop, twinLost: noop, laserFire: noop,
   };
   const w = new World(ev);
   w.god = true;
