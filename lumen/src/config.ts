@@ -58,10 +58,14 @@ export const CFG = {
     bounceBooster: 390,
     bounceCore: 500,
     /**
-     * Ceiling of the spark's flight. Kept well inside the screen's short side (420) so obstacles
-     * flying in are visible ~1 s before they can reach the spark, in every orientation.
+     * Lowest flight ceiling. The real ceiling follows the screen edges (the whole map is in play,
+     * further along the long side); incoming hazards are announced by arrows at the edge.
      */
     maxRadius: 285,
+    /** Gap kept between the spark and the screen edge (world units); more at the top for the HUD. */
+    edgeMargin: 46,
+    edgeMarginTop: 150,
+    edgeMarginBottom: 70,
     /** The spark dies when its centre gets this close to the core centre. */
     deathRadius: 58,
     /** Under this radius the core starts glowing red as a warning. */
@@ -110,6 +114,9 @@ export const CFG = {
     mineDefuse: 100,
     voidSmash: 150,
     cometSmash: 140,
+    bladeSmash: 120,
+    seekerSmash: 90,
+    holeSmash: 200,
     nearMiss: 25,
     /** Chain bonuses for DOUBLE, TRIPLE, MEGA, ULTRA, HYPER, LUMEN… */
     chainBonus: [0, 0, 10, 20, 40, 80, 160, 320],
@@ -151,6 +158,10 @@ export const CFG = {
     mine: [9, 14] as const,
     void: [8, 13] as const,
     comet: [6.5, 10] as const,
+    blade: [7, 11] as const,
+    seeker: [8, 12] as const,
+    laser: [7, 10] as const,
+    hole: [13, 18] as const,
     booster: [13, 20] as const,
     firstBooster: 22,
     /** Interval multiplier floor for late phases. */
@@ -180,6 +191,22 @@ export const CFG = {
     cometRadius: 24,
     cometSpeed: [1000, 1250] as const,
     cometWarn: 1.0,
+    bladeHalfLen: [80, 120] as const,
+    bladeWidth: 14,
+    bladeSpin: [1.4, 2.4] as const,
+    bladeSpeed: [90, 150] as const,
+    seekerRadius: 15,
+    seekerSpeed: 210,
+    seekerTurn: 1.5,
+    seekerLife: 6.5,
+    holeRadius: 34,
+    holePull: 260,
+    holeStrength: 820,
+    holeLife: 7,
+    holeSpeed: [35, 60] as const,
+    laserWarn: 1.15,
+    laserActive: 0.9,
+    laserWidth: 20,
   },
 
   booster: {
@@ -197,6 +224,21 @@ export const CFG = {
     shieldInvuln: 1.25,
     slowmo: 4,
     slowmoScale: 0.45,
+    /** Spring: bounces are this much stronger. */
+    spring: 7,
+    springScale: 1.45,
+    /** Double points. */
+    double: 8,
+    /** Ghost: passes through dark sides, hazards and the core. */
+    ghost: 5,
+    /** Levitation: gravity off, the spark hovers. */
+    levit: 5,
+    /** Light shower: number of orbs scattered over the whole map. */
+    showerOrbs: 36,
+    /** Freeze: obstacles stop moving and turning. */
+    freeze: 5,
+    /** Twin: a second spark on the opposite side collects and smashes too. */
+    twin: 8,
     /** Long tether: for 8 s the taut tether catches the spark at this radius (a safety rope). */
     longTether: 8,
     longTetherRadius: 175,
