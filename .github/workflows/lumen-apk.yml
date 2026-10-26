@@ -1,0 +1,72 @@
+# Optional: packages LUMEN with Capacitor into a debug-signed Android APK and uploads it as a
+# downloadable workflow artifact ("lumen-debug-apk"). See lumen/README.md for installation steps.
+name: LUMEN · Android APK
+
+on:
+  push:
+    branches: [main, master]
+    paths: ['lumen/**', '.github/workflows/lumen-apk.yml']
+  pull_request:
+    paths: ['lumen/**', '.github/workflows/lumen-apk.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lumen
+    env:
+      CAP_VERSION: 8.5.3
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: lumen/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # ubuntu runners ship the Android SDK ($ANDROID_HOME); just make sure licences are accepted
+      - name: Android SDK licences
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - run: npm ci
+
+      - name: Install Capacitor
+        run: npm install --no-save @capacitor/core@$CAP_VERSION @capacitor/cli@$CAP_VERSION @capacitor/android@$CAP_VERSION
+
+      - name: Build web app (relative base for the WebView)
+        env:
+          BASE_PATH: ./
+          VITE_NATIVE: '1'
+        run: npm run build
+
+      - name: Create Android project
+        run: |
+          npx cap add android
+          # portrait-only, vibration for haptics, keep the screen awake while playing
+          sed -i 's/<activity\b/<activity android:screenOrientation="portrait"/' android/app/src/main/AndroidManifest.xml
+          sed -i 's#<application#<uses-permission android:name="android.permission.VIBRATE" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />\n    <application#' android/app/src/main/AndroidManifest.xml
+          npx cap sync android
+
+      - name: Assemble debug APK (signed with the debug key)
+        working-directory: lumen/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk ../lumen-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lumen-debug-apk
+          path: lumen/lumen-debug.apk
+          retention-days: 30

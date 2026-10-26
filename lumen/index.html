@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>LUMEN</title>
+    <meta name="description" content="LUMEN — orbituj iskrą wokół rdzenia, zbieraj światło, rozbijaj jasne strony, unikaj ciemnych." />
+    <meta name="theme-color" content="#07020c" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="LUMEN" />
+    <meta name="application-name" content="LUMEN" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="msapplication-tap-highlight" content="no" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+    <!--STARTUP_IMAGES-->
+    <script>
+      // Android gets a portrait-locked manifest; iPad keeps both orientations.
+      (function () {
+        var ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        var l = document.createElement('link');
+        l.rel = 'manifest';
+        l.href = ios ? 'manifest-ios.webmanifest' : 'manifest.webmanifest';
+        document.head.appendChild(l);
+      })();
+    </script>
+    <style>
+      html, body { margin: 0; height: 100%; background: #07020c; overflow: hidden; }
+    </style>
+  </head>
+  <body>
+    <canvas id="gl" tabindex="-1" aria-label="LUMEN"></canvas>
+    <div id="ui"></div>
+    <div id="splash"><div class="dot"></div></div>
+    <noscript><p style="color:#fff;font-family:sans-serif;text-align:center;padding-top:40vh">LUMEN wymaga JavaScriptu.</p></noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
