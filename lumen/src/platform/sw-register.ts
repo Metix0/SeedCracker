@@ -7,16 +7,25 @@ import type { UI } from '../ui/ui';
  */
 export function registerSW(ui: UI): void {
   if (!('serviceWorker' in navigator) || import.meta.env.DEV) return;
+  // Reload only when the player asked for the update. The very first install also fires
+  // controllerchange (clients.claim) and must NOT interrupt a running game.
+  let updateRequested = false;
   let refreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (refreshing) return;
+    if (!updateRequested || refreshing) return;
     refreshing = true;
     location.reload();
   });
   const offer = (reg: ServiceWorkerRegistration): void => {
     const w = reg.waiting;
     if (!w || !navigator.serviceWorker.controller) return;
-    ui.toast(t('updateReady'), { sticky: true, onClick: () => w.postMessage({ type: 'SKIP_WAITING' }) });
+    ui.toast(t('updateReady'), {
+      sticky: true,
+      onClick: () => {
+        updateRequested = true;
+        w.postMessage({ type: 'SKIP_WAITING' });
+      },
+    });
   };
   const go = (): void => {
     navigator.serviceWorker

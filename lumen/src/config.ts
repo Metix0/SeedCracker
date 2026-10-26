@@ -90,8 +90,8 @@ export const CFG = {
     max: 10,
     comboTimeout: 2.0,
     /** Bar points required to reach the next level: base + perLevel * level */
-    barBase: 11,
-    barPerLevel: 4,
+    barBase: 14,
+    barPerLevel: 6,
     orbFill: 1,
     smashFill: 2.5,
     survivalFill: 0.35,
@@ -99,9 +99,9 @@ export const CFG = {
 
   phases: {
     /** Peak multiplier that starts each phase (index = phase number - 1). */
-    byMultiplier: [1, 2, 4, 5, 6, 8, 10],
+    byMultiplier: [1, 3, 5, 6, 7, 9, 10],
     /** Survival time fallback (s) that starts each phase anyway. */
-    byTime: [0, 26, 58, 95, 135, 180, 230],
+    byTime: [0, 32, 70, 110, 150, 195, 245],
     /** After the last listed phase a new one starts every N seconds. */
     extraEvery: 55,
     tempoPerPhase: 0.075,
@@ -132,8 +132,9 @@ export const CFG = {
     halfOrbRadius: [34, 82] as const,
     halfOrbSpeed: [120, 210] as const,
     halfOrbSpin: [0.25, 1.15] as const,
-    fallingRadius: [108, 150] as const,
-    fallingSpeed: [250, 360] as const,
+    /** max radius keeps a safe spot on the orbit (orbit radius - spark radius - margin) */
+    fallingRadius: [86, 112] as const,
+    fallingSpeed: [210, 300] as const,
     fallingWarn: 1.05,
     shardSize: [19, 26] as const,
     shardSpin: [1.8, 3.6] as const,

@@ -43,6 +43,7 @@ const BO = CFG.booster;
 const SC = CFG.score;
 const MU = CFG.multiplier;
 
+/** Float fields start at -0 for a stable double representation (see entities.ts). */
 export class World {
   mode = MODE_ATTRACT;
   readonly rng = new Rng(1);
@@ -51,8 +52,8 @@ export class World {
   daily = false;
 
   // time
-  t = 0;
-  runT = 0;
+  t = -0;
+  runT = -0;
   steps = 0;
 
   // view (world units) — informs falling-orb entry and warning markers only
@@ -60,13 +61,13 @@ export class World {
   viewHalfH = 500;
 
   // core
-  cx = 0; cy = 0; cpx = 0; cpy = 0;
-  crot = 0; cprot = 0;
+  cx = -0; cy = -0; cpx = -0; cpy = -0;
+  crot = -0; cprot = -0;
   private driftPhase = new Float32Array(4);
   heatState = 0; // 0 idle, 1 warning, 2 active
-  heatT = 0;
-  heatNext = 0;
-  heatExt = 0;
+  heatT = -0;
+  heatNext = -0;
+  heatExt = -0;
   readonly spikeAng = new Float32Array(6);
   spikeCount = 0;
 
@@ -75,10 +76,10 @@ export class World {
   private wasHeld = false;
   ang = -Math.PI / 2;
   pang = -Math.PI / 2;
-  omega = 0;
-  orbitR: number = SP.orbitRadius;
-  sx = 0; sy = 0; spx = 0; spy = 0;
-  sr: number = SP.radius;
+  omega = -0;
+  orbitR = -0;
+  sx = -0; sy = -0; spx = -0; spy = -0;
+  sr = -0;
   readonly trail = new Float32Array(SP.trailLength * 2);
   trailHead = 0;
   trailCount = 0;
@@ -100,33 +101,33 @@ export class World {
   score = 0;
   mult = 1;
   bar = 0;
-  comboT = 0;
+  comboT = -0;
   comboLive = false;
   noteIdx = 0;
   chain = 0;
-  chainT = 0;
+  chainT = -0;
   holdOrbs = 0;
   phase = 1;
-  phaseT = 0;
-  tempo = 1;
+  phaseT = -0;
+  tempo = -0;
   stats: RunStats = newRunStats();
 
   // boosters (sim seconds remaining)
-  prismT = 0;
-  rocketT = 0;
-  boltT = 0;
-  magnetT = 0;
-  slowT = 0;
-  tetherT = 0;
+  prismT = -0;
+  rocketT = -0;
+  boltT = -0;
+  magnetT = -0;
+  slowT = -0;
+  tetherT = -0;
   shield = false;
-  invulnT = 0;
-  novaT = -1;
-  novaX = 0; novaY = 0; novaR = 0;
+  invulnT = -0;
+  novaT = -0;
+  novaX = -0; novaY = -0; novaR = -0;
   private endingFlags = 0;
 
   // death
-  deathX = 0; deathY = 0;
-  deadT = 0;
+  deathX = -0; deathY = -0;
+  deadT = -0;
 
   // ghost (daily challenge)
   readonly ghostRec = new Float32Array(2 * 30 * 60 * 12);

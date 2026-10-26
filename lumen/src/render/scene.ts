@@ -489,9 +489,9 @@ export class SceneDrawer {
     const f = t / dur;
     const a = (f < 0.12 ? f / 0.12 : 1 - (f - 0.12) / 0.88) * (c.reduced ? 0.5 : 1);
     const th = c.theme;
-    const wdt = 70 * (1 - f * 0.6) + 10;
-    rd.push(SH.BEAM, cx, c.camY, 0, wdt, halfH + 40, th.orb[0] * 1.2, th.orb[1] * 1.2, th.orb[2] * 1.2, a * 1.2, 0, 0, 0, 0, 0, 0, 0, 0);
-    rd.push(SH.BEAM, cx, c.camY, 0, wdt * 0.25, halfH + 40, 3, 3, 3, a, 0, 0, 0, 0, 0, 0, 0, 0);
+    const wdt = 38 * (1 - f * 0.6) + 6;
+    rd.push(SH.BEAM, cx, c.camY, 0, wdt, halfH + 40, th.orb[0] * 0.8, th.orb[1] * 0.8, th.orb[2] * 0.8, a * 0.7, 0, 0, 0, 0, 0, 0, 0, 0);
+    rd.push(SH.BEAM, cx, c.camY, 0, wdt * 0.2, halfH + 40, 2.2, 2.2, 2.2, a * 0.7, 0, 0, 0, 0, 0, 0, 0, 0);
     void cy;
   }
 
@@ -520,9 +520,9 @@ export class SceneDrawer {
     const th = c.theme;
     const inK = t < 0.35 ? easeOutBack(t / 0.35) : 1;
     const out = t > dur - 0.4 ? (dur - t) / 0.4 : 1;
+    const main = c.bannerKind === 1 ? 96 : 84;
     const hudBottom = c.camY - halfH + c.safeTop + 170;
     const y = Math.max(hudBottom + main * 0.5, c.bannerKind === 1 ? c.camY - halfH * 0.42 : cy - CFG.spark.orbitRadius - 110);
-    const main = c.bannerKind === 1 ? 96 : 84;
     const spread = (1 - out) * 0.25;
     const bx = c.bannerKind === 1 ? c.camX : cx;
     rd.text(c.bannerMain, bx, y, main * inK, 0,

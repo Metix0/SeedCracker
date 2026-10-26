@@ -77,8 +77,8 @@ export class ThemeMix {
   bg0 = new Float32Array(3); bg1 = new Float32Array(3); bg2 = new Float32Array(3); bg3 = new Float32Array(3);
   light = new Float32Array(3); dark = new Float32Array(3); darkRim = new Float32Array(3);
   orb = new Float32Array(3); spark = new Float32Array(3); star = new Float32Array(3);
-  private from = 0;
-  private to = 0;
+  private from = -0;
+  private to = -0;
   private t = 1;
   private dur = 2.5;
 

@@ -17,7 +17,7 @@ import { Renderer, type FrameParams } from '../render/renderer';
 import { BOOSTER_COLORS, SceneDrawer, type DrawCtx } from '../render/scene';
 import { GlyphAtlas, TextBuf } from '../render/text';
 import { UI } from '../ui/ui';
-import { B_NOVA, B_PRISM, B_SHIELD, B_SLOW, K_COMET, K_FALL, K_MINE, K_SHARD, K_VOID, type RunStats } from './entities';
+import { B_NOVA, B_PRISM, B_SHIELD, B_SLOW, K_COMET, K_FALL, K_MINE, K_SHARD, K_VOID, type Floater, type RunStats } from './entities';
 import { ThemeMix, THEMES } from './themes';
 import { MODE_ATTRACT, MODE_DEAD, MODE_PLAY, World, type WorldEvents } from './world';
 
@@ -50,38 +50,38 @@ export class Game implements WorldEvents {
   look: Look;
 
   // juice
-  private time = 0;
-  private hitStop = 0;
-  private trauma = 0;
-  private flash = 0;
+  private time = -0;
+  private hitStop = -0;
+  private trauma = -0;
+  private flash = -0;
   private flashCol = new Float32Array([1, 1, 1]);
-  private ca = 0;
-  private zoom = 1;
-  private zoomKick = 0;
-  private camX = 0;
-  private camY = 0;
-  private deathT = 0;
-  private hudScore = 0;
-  private hudPulse = 0;
-  private hudVisible = 0;
-  private bannerT = -1;
+  private ca = -0;
+  private zoom = -0;
+  private zoomKick = -0;
+  private camX = -0;
+  private camY = -0;
+  private deathT = -0;
+  private hudScore = -0;
+  private hudPulse = -0;
+  private hudVisible = -0;
+  private bannerT = -0;
   private bannerKind = 0;
   private bannerMain = new TextBuf();
   private bannerSub = new TextBuf();
-  private beamT = -1;
+  private beamT = -0;
   private countdown = 0;
-  private countdownT = 0;
+  private countdownT = -0;
   private prismAudio = false;
   private slowAudio = false;
-  private missionTimer = 0;
-  private shieldFlash = 0;
-  private visualMul = 1; // stronger visuals where vibration is unavailable (iPad)
+  private missionTimer = -0;
+  private shieldFlash = -0;
+  private visualMul = -0; // stronger visuals where vibration is unavailable (iPad)
   private dailyRun = false;
   private ghostData: Float32Array | null = null;
   private lastRun: RunStats | null = null;
   private frame: FrameParams;
   private dctx: DrawCtx;
-  private reducedMul = 1;
+  private reducedMul = -0;
 
   constructor(canvas: HTMLCanvasElement, uiRoot: HTMLElement, fontFamily: string) {
     this.canvas = canvas;
@@ -90,6 +90,10 @@ export class Game implements WorldEvents {
     this.world = new World(this);
     this.look = resolveLook(this.store.data.equip);
     this.visualMul = CAN_VIBRATE ? 1 : 1.3;
+    this.reducedMul = 1;
+    this.zoom = 1;
+    this.bannerT = -1;
+    this.beamT = -1;
     refillMissions(this.store.data);
     this.store.save();
 
@@ -491,7 +495,9 @@ export class Game implements WorldEvents {
       if (this.fpsT > 0.5) { this.fpsT = 0; this.ui.setFps(this.loop.fps); }
     }
   }
-  private fpsT = 0;
+  private fpsT = -0;
+  private chainF: Floater | null = null;
+  private chainF2: Floater | null = null;
 
   /** Ambient particles: comet tails, spark sparkle, prism shards. Rates are per real second. */
   private ambient(dt: number): void {
@@ -598,9 +604,12 @@ export class Game implements WorldEvents {
     const word = CHAIN_WORDS[Math.min(n, CHAIN_WORDS.length - 1)];
     const th = this.theme;
     const size = 40 + Math.min(5, n - 2) * 8;
-    const f = this.world.floater(1, x, y - 60, size, 1.3, 2.4, 2.0, 0.9);
+    // a new chain word replaces the previous one instead of stacking on top of it
+    if (this.chainF && this.chainF.active) this.chainF.active = false;
+    if (this.chainF2 && this.chainF2.active) this.chainF2.active = false;
+    const f = (this.chainF = this.world.floater(1, x, y - 60, size, 1.3, 2.4, 2.0, 0.9));
     if (f) f.buf.str(word);
-    const f2 = this.world.floater(0, x, y - 60 + size * 0.85, size * 0.6, 1.3, 2.2, 2.0, 1.2);
+    const f2 = (this.chainF2 = this.world.floater(0, x, y - 60 + size * 1.05, size * 0.6, 1.3, 2.2, 2.0, 1.2));
     if (f2) f2.buf.ch(43).int(bonus);
     this.doFlash(0.1 + n * 0.035, th.bg3[0], th.bg3[1], th.bg3[2]);
     this.ca = Math.min(1.2, this.ca + 0.2 + n * 0.06);

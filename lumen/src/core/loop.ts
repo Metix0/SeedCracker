@@ -16,15 +16,15 @@ export interface LoopHooks {
  */
 export class Loop {
   readonly dt = 1 / CFG.sim.hz;
-  private acc = 0;
+  private acc = -0;
   private last = -1;
   private running = false;
-  private raf = 0;
-  private capInterval = 0;
-  private lastPresent = 0;
-  fps = 0;
-  private fpsAcc = 0;
-  private fpsFrames = 0;
+  private raf = -0;
+  private capInterval = -0;
+  private lastPresent = -0;
+  fps = -0;
+  private fpsAcc = -0;
+  private fpsFrames = -0;
 
   constructor(private hooks: LoopHooks) {}
 
@@ -63,14 +63,24 @@ export class Loop {
       this.fpsFrames = 0;
     }
 
-    this.acc += frameDt * this.hooks.timeScale();
-    let steps = 0;
-    while (this.acc >= this.dt && steps < CFG.sim.maxSteps) {
-      this.hooks.step(this.dt);
-      this.acc -= this.dt;
-      steps++;
+    try {
+      this.acc += frameDt * this.hooks.timeScale();
+      let steps = 0;
+      while (this.acc >= this.dt && steps < CFG.sim.maxSteps) {
+        this.hooks.step(this.dt);
+        this.acc -= this.dt;
+        steps++;
+      }
+      if (steps >= CFG.sim.maxSteps) this.acc = 0;
+      this.hooks.render(this.acc / this.dt, frameDt);
+    } catch (e) {
+      // never let one bad frame kill the loop; report each distinct error once
+      const msg = String(e);
+      if (msg !== this.lastError) {
+        this.lastError = msg;
+        console.error(e);
+      }
     }
-    if (steps >= CFG.sim.maxSteps) this.acc = 0;
-    this.hooks.render(this.acc / this.dt, frameDt);
   };
+  private lastError = '';
 }

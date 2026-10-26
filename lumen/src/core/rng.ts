@@ -1,14 +1,16 @@
 /** Small, fast, seedable PRNG (mulberry32). Used for deterministic spawning (daily challenge). */
 export class Rng {
-  private s: number;
+  // state lives in a typed array: a uint32 in a plain field would flip between small-int and
+  // heap-double representations and deoptimise callers
+  private st = new Uint32Array(1);
   constructor(seed = 1) {
-    this.s = seed >>> 0;
+    this.st[0] = seed >>> 0;
   }
   seed(seed: number): void {
-    this.s = seed >>> 0;
+    this.st[0] = seed >>> 0;
   }
   next(): number {
-    let t = (this.s = (this.s + 0x6d2b79f5) >>> 0);
+    let t = (this.st[0] = (this.st[0] + 0x6d2b79f5) >>> 0);
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;

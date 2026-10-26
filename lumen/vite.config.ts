@@ -31,13 +31,16 @@ function startupImages(): Plugin {
 /** Generates dist/sw.js with a precache list of every emitted file and a content-hash version. */
 function serviceWorker(): Plugin {
   let outDir = 'dist';
+  let skip = false;
   return {
     name: 'lumen-sw',
     apply: 'build',
     configResolved(c) {
       outDir = c.build.outDir;
+      skip = !!c.build.ssr; // tooling builds (allocation harness) need no service worker
     },
     async closeBundle() {
+      if (skip) return;
       const { writeFileSync, readFileSync } = await import('node:fs');
       const files: string[] = [];
       const walk = (dir: string): void => {
@@ -68,7 +71,8 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
   build: {
-    target: ['es2022', 'safari15', 'chrome100'],
+    // Safari 16+: native class fields (lowering them to defineProperty puts hot objects into V8 dictionary mode)
+    target: ['es2022', 'safari16', 'chrome110'],
     assetsInlineLimit: 0,
     sourcemap: false,
     chunkSizeWarningLimit: 1000,

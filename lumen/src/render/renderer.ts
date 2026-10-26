@@ -204,8 +204,17 @@ export class Renderer {
     this.count++;
   }
 
+  // The helpers below write straight into the instance buffer instead of forwarding to push():
+  // a second call level would make V8 box every float argument (heap allocation per sprite).
+
   glow(x: number, y: number, r: number, cr: number, cg: number, cb: number, a: number): void {
-    this.push(SH.GLOW, x, y, 0, r, r, cr, cg, cb, a, 0, 0, 0, 0, 0, 0, 0, 0);
+    if (this.count >= CAPACITY) return;
+    const d = this.data, o = this.count++ * FLOATS;
+    d[o] = x; d[o + 1] = y; d[o + 2] = 0; d[o + 3] = SH.GLOW;
+    d[o + 4] = r; d[o + 5] = r;
+    d[o + 6] = cr; d[o + 7] = cg; d[o + 8] = cb; d[o + 9] = a;
+    d[o + 10] = 0; d[o + 11] = 0; d[o + 12] = 0; d[o + 13] = 0;
+    d[o + 14] = 0; d[o + 15] = 0; d[o + 16] = 0; d[o + 17] = 0;
   }
 
   seg(
@@ -213,11 +222,16 @@ export class Renderer {
     cr: number, cg: number, cb: number, ca: number,
     gr: number, gg: number, gb: number, ga: number, glowR: number, dash = 0,
   ): void {
+    if (this.count >= CAPACITY) return;
     const dx = bx - ax, dy = by - ay;
     const len = Math.sqrt(dx * dx + dy * dy);
     const m = r + glowR * 3;
-    this.push(SH.SEG, (ax + bx) * 0.5, (ay + by) * 0.5, Math.atan2(dy, dx), len * 0.5 + m, m,
-      cr, cg, cb, ca, gr, gg, gb, ga, len * 0.5, r, glowR, dash);
+    const d = this.data, o = this.count++ * FLOATS;
+    d[o] = (ax + bx) * 0.5; d[o + 1] = (ay + by) * 0.5; d[o + 2] = Math.atan2(dy, dx); d[o + 3] = SH.SEG;
+    d[o + 4] = len * 0.5 + m; d[o + 5] = m;
+    d[o + 6] = cr; d[o + 7] = cg; d[o + 8] = cb; d[o + 9] = ca;
+    d[o + 10] = gr; d[o + 11] = gg; d[o + 12] = gb; d[o + 13] = ga;
+    d[o + 14] = len * 0.5; d[o + 15] = r; d[o + 16] = glowR; d[o + 17] = dash;
   }
 
   /** Measure text width (world units) for a given em size. */
@@ -249,9 +263,14 @@ export class Renderer {
       const gl = code === 32 ? this.atlas.space : this.atlas.get(code);
       if (!gl) continue;
       const adv = gl.adv * size;
-      if (code !== 32) {
+      if (code !== 32 && this.count < CAPACITY) {
         const lx = cx + adv / 2;
-        this.push(SH.GLYPH, x + lx * c, y + lx * s, rot, hw, hh, r, g, b, a, gr, gg, gb, ga, gl.u0, gl.v0, gl.u1, gl.v1);
+        const d = this.data, o = this.count++ * FLOATS;
+        d[o] = x + lx * c; d[o + 1] = y + lx * s; d[o + 2] = rot; d[o + 3] = SH.GLYPH;
+        d[o + 4] = hw; d[o + 5] = hh;
+        d[o + 6] = r; d[o + 7] = g; d[o + 8] = b; d[o + 9] = a;
+        d[o + 10] = gr; d[o + 11] = gg; d[o + 12] = gb; d[o + 13] = ga;
+        d[o + 14] = gl.u0; d[o + 15] = gl.v0; d[o + 16] = gl.u1; d[o + 17] = gl.v1;
       }
       cx += adv + tracking * size;
     }

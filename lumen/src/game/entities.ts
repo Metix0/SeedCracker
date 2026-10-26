@@ -13,26 +13,32 @@ export const BOOSTERS = ['prism', 'rocket', 'bolt', 'magnet', 'shield', 'slow', 
 export type BoosterId = (typeof BOOSTERS)[number];
 export const B_PRISM = 0, B_ROCKET = 1, B_BOLT = 2, B_MAGNET = 3, B_SHIELD = 4, B_SLOW = 5, B_NOVA = 6, B_TETHER = 7;
 
+/*
+ * Float fields are initialised with -0 (a heap double, not a small integer) so V8 gives them a
+ * double representation from the start. Otherwise the first fractional write mid-run changes
+ * the object's hidden class and deoptimises the hot game-loop code ("wrong map").
+ */
+
 export class Obstacle {
   active = false;
   kind = 0;
-  x = 0; y = 0; px = 0; py = 0;
-  vx = 0; vy = 0;
-  rot = 0; prot = 0; spin = 0;
-  r = 0;
-  t = 0;
-  fade = 0;
-  flash = 0;
+  x = -0; y = -0; px = -0; py = -0;
+  vx = -0; vy = -0;
+  rot = -0; prot = -0; spin = -0;
+  r = -0;
+  t = -0;
+  fade = -0;
+  flash = -0;
   /** mine: fuse remaining; ring: engaged flag */
-  fuse = 0;
+  fuse = -0;
   state = 0;
-  waveR = 0;
-  waveT = 0;
+  waveR = -0;
+  waveT = -0;
   /** near-miss bookkeeping */
   nearIn = false;
   nearDone = false;
   /** sub-step stash */
-  sx = 0; sy = 0;
+  sx = -0; sy = -0;
   reset(): void {
     this.active = true;
     this.t = 0; this.fade = 0; this.flash = 0; this.fuse = 0; this.state = 0;
@@ -43,66 +49,66 @@ export class Obstacle {
 
 export class Orb {
   active = false;
-  x = 0; y = 0; px = 0; py = 0;
-  vx = 0; vy = 0;
+  x = -0; y = -0; px = -0; py = -0;
+  vx = -0; vy = -0;
   anchored = false;
-  ox = 0; oy = 0; // offset from core when anchored
-  t = 0;
-  delay = 0;
-  life = 0;
-  homing = 0;
+  ox = -0; oy = -0; // offset from core when anchored
+  t = -0;
+  delay = -0;
+  life = -0;
+  homing = -0;
   big = false;
-  dying = 0;
+  dying = -0;
 }
 
 export class Bubble {
   active = false;
   type = 0;
-  x = 0; y = 0; px = 0; py = 0;
-  ox = 0; oy = 0;
-  t = 0;
-  life = 0;
+  x = -0; y = -0; px = -0; py = -0;
+  ox = -0; oy = -0;
+  t = -0;
+  life = -0;
 }
 
 export class Warning {
   active = false;
   kind = 0; // K_FALL or K_COMET
-  x = 0; y = 0; dx = 0; dy = 0;
-  t = 0;
-  dur = 0;
-  r = 0;
-  speed = 0;
-  rot = 0;
-  spin = 0;
+  x = -0; y = -0; dx = -0; dy = -0;
+  t = -0;
+  dur = -0;
+  r = -0;
+  speed = -0;
+  rot = -0;
+  spin = -0;
 }
 
 export class Floater {
   active = false;
   buf = new TextBuf();
-  x = 0; y = 0;
-  t = 0;
-  life = 1;
-  size = 30;
+  x = -0; y = -0;
+  t = -0;
+  life = -0;
+  size = -0;
   /** 0 = score (+N), 1 = chain text, 2 = near miss, 3 = info */
   style = 0;
-  r = 1; g = 1; b = 1;
+  r = -0; g = -0; b = -0;
 }
 
 export class Bolt {
   active = false;
-  ax = 0; ay = 0; bx = 0; by = 0;
-  t = 0;
-  seed = 0;
+  ax = -0; ay = -0; bx = -0; by = -0;
+  t = -0;
+  seed = -0;
 }
 
 export class Shock {
   active = false;
-  x = 0; y = 0;
-  t = 0;
-  dur = 0.6;
-  maxR = 300;
-  r = 1; g = 1; b = 1; a = 1;
-  band = 20;
+  x = -0; y = -0;
+  t = -0;
+  dur = -0;
+  maxR = -0;
+  r = -0; g = -0; b = -0; a = -0;
+  band = -0;
 }
 
 /** Fixed-size pool; `get()` returns an inactive item (or recycles index 0 when full). */
