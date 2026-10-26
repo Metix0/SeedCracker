@@ -214,71 +214,114 @@ export class Director {
   // "stepping stones" at different heights: rings, arcs, descending spirals, rotating wreaths
   // and clusters. Holding the finger steers the falling spark onto them.
 
+  /** Motion applied by orbArc() to the orbs it spawns (reused scratch, see Orb polar fields). */
+  private mo = { amp: 0, freq: 0, k: 0, ph: 0, phStep: 0, aamp: 0, af: 0, sink: 0 };
+
+  private still(): void {
+    const m = this.mo;
+    m.amp = m.freq = m.k = m.ph = m.phStep = m.aamp = m.af = m.sink = 0;
+  }
+
   private orbPattern(): void {
-    const w = this.w, r = w.rng;
+    const w = this.w, r = w.rng, m = this.mo;
     if (w.orbs.countActive() > 140) return;
     const attract = w.mode !== 1;
     const t = w.runT;
     const life = CFG.orb.anchoredLife;
-    // first seconds: generous rings just under the spark, so the very first fall bounces
+    this.still();
+    // first seconds: generous, gently breathing rings just under the spark (the first fall bounces)
     if (attract || this.firstPattern || (t < 10 && r.chance(0.6))) {
       this.firstPattern = false;
-      this.orbArc(r.range(118, 165), 0, TAU, r.range(-0.25, 0.25), life);
+      m.amp = 14; m.freq = 1.8;
+      this.orbArc(r.range(118, 160), 0, TAU, r.range(-0.25, 0.25), life);
       return;
     }
     const roll = r.next();
-    if (roll < 0.12) {
-      // full ring (with one gap late in the run)
+    if (roll < 0.1) {
+      // breathing ring: the whole ring swells and shrinks (with a gap later in the run)
       const gap = w.phase >= 3 ? r.range(0.5, 1.1) : 0;
-      this.orbArc(r.range(110, 270), r.next() * TAU, TAU - gap, r.range(-0.35, 0.35), life);
-    } else if (roll < 0.46) {
-      // arc ahead of the spark, slightly below it
-      const rad = Math.max(105, Math.min(270, w.orbitR - r.range(-40, 100)));
-      this.orbArc(rad, w.ang + r.range(0.4, 2.4), r.range(1.0, 2.6), r.range(-0.4, 0.4), life);
-    } else if (roll < 0.7) {
-      // descending spiral: follows the path of a spark that orbits while falling
-      const n = r.int(12, 18);
+      m.amp = r.range(25, 45); m.freq = r.range(1.6, 2.6);
+      this.orbArc(r.range(140, 230), r.next() * TAU, TAU - gap, r.range(-0.3, 0.3), life);
+    } else if (roll < 0.24) {
+      // flower: a ring with travelling waves (k petals) that also turns
+      m.amp = r.range(24, 40); m.freq = r.range(1.6, 2.6) * r.sign(); m.k = r.int(3, 5);
+      this.orbArc(r.range(150, 220), r.next() * TAU, TAU, r.range(-0.3, 0.3), life);
+    } else if (roll < 0.4) {
+      // pendulum: an arc ahead of the spark swinging back and forth
+      m.aamp = r.range(0.35, 0.7); m.af = r.range(1.2, 2.0);
+      const rad = Math.max(110, Math.min(260, w.orbitR - r.range(-30, 90)));
+      this.orbArc(rad, w.ang + r.range(0.6, 2.4), r.range(0.9, 1.8), 0, life);
+    } else if (roll < 0.52) {
+      // sinking spiral: turns while slowly falling into the core
+      const n = r.int(12, 16);
       const a0 = w.ang + r.range(0.3, 1.2);
       const r0 = r.range(230, 275);
       for (let i = 0; i < n; i++) {
-        const a = a0 + i * 0.36;
-        const rad = r0 - i * ((r0 - 110) / n);
-        w.spawnOrb(w.cx + Math.cos(a) * rad, w.cy + Math.sin(a) * rad, 0, 0, true, i * 0.03, life);
+        const a = a0 + i * 0.4;
+        const rad = r0 - i * ((r0 - 120) / n);
+        const o = w.spawnOrb(w.cx + Math.cos(a) * rad, w.cy + Math.sin(a) * rad, 0, 0, true, i * 0.03, life, 0, 0.35);
+        if (o) o.sink = -r.range(16, 26);
       }
-    } else if (roll < 0.84) {
-      // two counter-rotating wreaths
+    } else if (roll < 0.62) {
+      // two counter-rotating half wreaths, breathing in opposite phase
       const inner = r.range(110, 150);
+      m.amp = 18; m.freq = 2.2;
       this.orbArc(inner, r.next() * TAU, TAU * 0.5, 0.55, life);
-      this.orbArc(inner + r.range(80, 120), r.next() * TAU, TAU * 0.5, -0.45, life);
-    } else if (roll < 0.94) {
-      // clusters scattered around the core
-      const k = r.int(3, 5);
+      m.ph = Math.PI;
+      this.orbArc(inner + r.range(80, 115), r.next() * TAU, TAU * 0.5, -0.45, life);
+    } else if (roll < 0.72) {
+      // snake: a wiggling train of orbs slithering around the core
+      m.amp = r.range(38, 58); m.freq = r.range(3.0, 4.2); m.phStep = 0.55;
+      const n = r.int(10, 14);
+      const dir = r.sign();
+      this.orbArc(r.range(160, 220), w.ang + r.range(1.5, 3.5), n * 0.2, dir * r.range(0.8, 1.15), life);
+    } else if (roll < 0.84) {
+      // fountain: orbs shoot out from the core, slow down and fall back — catch them mid-air
+      const a0 = w.ang + r.range(0.8, 2.6);
+      const n = r.int(7, 10);
+      for (let i = 0; i < n; i++) {
+        const a = a0 + (i - n / 2) * 0.07 + r.range(-0.03, 0.03);
+        const sp = r.range(320, 430);
+        const x = w.cx + Math.cos(a) * 72, y = w.cy + Math.sin(a) * 72;
+        const o = w.spawnOrb(x, y, Math.cos(a) * sp, Math.sin(a) * sp, false, i * 0.09, 4);
+        if (o) o.grav = 330;
+      }
+    } else if (roll < 0.93) {
+      // drifting clusters that wobble in little loops
+      const k = r.int(3, 4);
       for (let c = 0; c < k; c++) {
-        const a = r.next() * TAU, rad = r.range(115, 265);
+        const a = r.next() * TAU, rad = r.range(130, 255), ph = r.next() * TAU;
         for (let i = 0; i < 4; i++) {
-          const ox = r.range(-26, 26), oy = r.range(-26, 26);
-          w.spawnOrb(w.cx + Math.cos(a) * rad + ox, w.cy + Math.sin(a) * rad + oy, 0, 0, true, c * 0.08 + i * 0.03, life);
+          const ox = r.range(-24, 24), oy = r.range(-24, 24);
+          const o = w.spawnOrb(w.cx + Math.cos(a) * rad + ox, w.cy + Math.sin(a) * rad + oy, 0, 0, true, c * 0.08 + i * 0.03, life, 0, 0.25);
+          if (o) { o.amp = 22; o.freq = 2.4; o.ph = ph; o.aamp = 0.14; o.af = 1.9; }
         }
       }
     } else {
-      // a line of orbs drifting across the field
-      const n = r.int(6, 9);
+      // a curving stream of orbs flying in from the edge, bent by the core's pull
+      const n = r.int(7, 10);
       const a = r.next() * TAU;
       const dx = -Math.cos(a), dy = -Math.sin(a);
-      const off = r.range(-200, 200);
-      const bx = w.cx + Math.cos(a) * 640 - dy * off, by = w.cy + Math.sin(a) * 640 + dx * off;
-      for (let i = 0; i < n; i++) w.spawnOrb(bx - dx * i * 38, by - dy * i * 38, dx * 150, dy * 150, false, 0, 10);
+      const off = r.range(140, 230) * r.sign();
+      const bx = w.cx + Math.cos(a) * 600 - dy * off, by = w.cy + Math.sin(a) * 600 + dx * off;
+      for (let i = 0; i < n; i++) {
+        const o = w.spawnOrb(bx - dx * i * 40, by - dy * i * 40, dx * 170, dy * 170, false, 0, 9);
+        if (o) o.grav = 45;
+      }
     }
   }
 
-  /** Orbs on an arc of radius `rad` from angle a0 spanning `span`, spaced ~44 units apart. */
+  /** Orbs on an arc of radius `rad` from angle a0 spanning `span` (~50 units apart), moving per `mo`. */
   private orbArc(rad: number, a0: number, span: number, spin: number, life: number): void {
-    const w = this.w;
+    const w = this.w, m = this.mo;
     const full = span >= TAU - 1e-3;
     const n = Math.max(4, Math.round((rad * span) / 50));
     for (let i = 0; i < n; i++) {
       const a = a0 + (full ? (i / n) * TAU : (i / Math.max(1, n - 1)) * span);
-      w.spawnOrb(w.cx + Math.cos(a) * rad, w.cy + Math.sin(a) * rad, 0, 0, true, i * 0.02, life, 0, spin);
+      const o = w.spawnOrb(w.cx + Math.cos(a) * rad, w.cy + Math.sin(a) * rad, 0, 0, true, i * 0.02, life, 0, spin);
+      if (!o) continue;
+      o.amp = m.amp; o.freq = m.freq; o.k = m.k; o.ph = m.ph + m.phStep * i;
+      o.aamp = m.aamp; o.af = m.af; o.sink = m.sink;
     }
   }
 }
